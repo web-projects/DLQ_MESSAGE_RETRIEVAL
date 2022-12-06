@@ -19,6 +19,9 @@ namespace DLQ.MessageRetrieval.Providers
         private static string instanceSubscriptionKey;
         private static string SubscriptionKey;
 
+        public static string GetSubscriptionKey()
+            => SubscriptionKey;
+
         public static async Task<string> SetFilter(ServiceBus configuration)
         {
             serviceBusConfiguration = configuration;
@@ -74,26 +77,23 @@ namespace DLQ.MessageRetrieval.Providers
 
         private static async Task SetSubjectFilterAsync(string filterString)
         {
-            //if (sbClient is { })
+            CorrelationRuleFilter correlationRuleFilter = new CorrelationRuleFilter()
             {
-                CorrelationRuleFilter correlationRuleFilter = new CorrelationRuleFilter()
-                {
-                    Subject = filterString
-                };
+                Subject = filterString
+            };
 
-                CreateRuleOptions ruleOptions = new CreateRuleOptions(filterRuleName, correlationRuleFilter);
-                instanceSubscriptionKey = SubscriptionKey;
+            CreateRuleOptions ruleOptions = new CreateRuleOptions(filterRuleName, correlationRuleFilter);
+            instanceSubscriptionKey = SubscriptionKey;
 
-                await CreateRuleAsync(serviceBusConfiguration.Topic, instanceSubscriptionKey, ruleOptions).ConfigureAwait(false);
-                Debug.WriteLine($"ASB filter rule '{filterString}' created for SubscriptionKey: [{SubscriptionKey}]");
+            await CreateRuleAsync(serviceBusConfiguration.Topic, instanceSubscriptionKey, ruleOptions).ConfigureAwait(false);
+            Debug.WriteLine($"ASB filter rule '{filterString}' created for SubscriptionKey: [{SubscriptionKey}]");
 
-                if (!string.IsNullOrWhiteSpace(lastRuleName))
-                {
-                    await DeleteRuleAsync(serviceBusConfiguration.Topic, instanceSubscriptionKey, lastRuleName).ConfigureAwait(false);
-                }
-
-                lastRuleName = filterRuleName;
+            if (!string.IsNullOrWhiteSpace(lastRuleName))
+            {
+                await DeleteRuleAsync(serviceBusConfiguration.Topic, instanceSubscriptionKey, lastRuleName).ConfigureAwait(false);
             }
+
+            lastRuleName = filterRuleName;
         }
 
         private static async Task CreateRuleAsync(string configurationTopic, string instanceSubscriptionKey, CreateRuleOptions ruleOptions)

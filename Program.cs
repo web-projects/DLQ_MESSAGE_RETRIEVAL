@@ -1,6 +1,5 @@
 ﻿using DeadletterQueue.Providers;
 using DLQ.MessageRetrieval.Configuration;
-using log4net;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Diagnostics;
@@ -8,31 +7,42 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace DeadletterQueue
 {
-    class Program
+    static class Program
     {
         static private AppConfig configuration;
 
-        //private static string connectionString = ConfigurationManager.AppSettings["Channels:Servers:ServiceBus:ConnectionString"];
-        //private static string topicName = ConfigurationManager.AppSettings["GroupAssetTopic"];
-        //private static string subscriptionName = ConfigurationManager.AppSettings["GroupAssetSubscription"];
-        //private static string databaseEndPoint = ConfigurationManager.AppSettings["DatabaseEndPoint"];
-        //private static string databaseKey = ConfigurationManager.AppSettings["DatabaseKey"];
-        //private static string deadLetterQueuePath = "/$DeadLetterQueue";
-
-        //private static IGroupAssetSyncService groupAssetSyncService;
-        private static ILog log;
-
-        public static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             try
             {
-                log4net.Config.BasicConfigurator.Configure();
-                log = LogManager.GetLogger(typeof(Program));
                 SetupEnvironment();
-                DLQMessageReader.ReadDLQMessages(configuration.Channels.Servers.First().ServiceBus, log);
+
+                ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
+
+                // FilterRule name
+                string filterRuleName = await DLQMessageProcessor.CreateFilterRule(serviceBus);
+
+                // Write messages to DLQ
+                await DLQMessageProcessor.WriteDLQMessages(serviceBus).ConfigureAwait(false);
+
+                // Wait for DLQ messages to build
+                //await DLQMessageProcessor.ExceedMaxDelivery(serviceBus).ConfigureAwait(false);
+
+                // Wait for DLQ messages to post
+                Console.Write($"\r\nWaiting {serviceBus.DeadLetterQueueCheckSec} seconds for messages to expire");
+
+                for (int i = 0; i < serviceBus.DeadLetterQueueCheckSec; i++)
+                {
+                    Console.Write(".");
+                    await Task.Delay(1000);
+                }
+
+                // Read messages from DLQ
+                await DLQMessageProcessor.ReadDLQMessages(serviceBus).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -44,7 +54,9 @@ namespace DeadletterQueue
             //    documentClient.Dispose();
             //}
 
-            Console.WriteLine("All message read successfully from Deadletter queue");
+            Console.WriteLine("\r\nAll message read successfully from Deadletter queue");
+
+            Console.WriteLine("Press <ENTER> to end.");
             Console.ReadLine();
         }
 

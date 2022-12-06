@@ -16,5 +16,6 @@ namespace DLQ.MessageRetrieval.Configuration
         public bool DeadLetterOnMessageExpiration { get; set; } = false;
         public string DeadLetterQueuePath { get; set; }
         public string LastFilterNameUsed { get; set; }
+        public int DeadLetterQueueCheckSec { get; set; }
     }
 }
