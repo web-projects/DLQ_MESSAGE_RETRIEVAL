@@ -42,7 +42,7 @@ namespace DeadletterQueue.Providers
 
             int counter = 0;
 
-            Console.WriteLine("\r\n\r\nProcessing DLQ messages...");
+            Console.WriteLine("Processing DLQ messages...");
 
             while (true)
             {
@@ -50,7 +50,7 @@ namespace DeadletterQueue.Providers
 
                 if (brokerDLQMessage is { })
                 {
-                    Console.WriteLine($"{string.Format("{0:D3}", ++counter)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
+                    Console.WriteLine($"{string.Format("{0:D3}", counter++)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
 
                     BrokerMessage brokerMessage = GetBrokerMessageFromBinaryData(brokerDLQMessage.Body);
 
@@ -60,12 +60,13 @@ namespace DeadletterQueue.Providers
                         {
                             Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{brokerMessage.StringData}]");
                         }
+
+                        // Peform resources and task cleanup
+                        // ToDO
+
+                        // Remove message from DLQ to processing...
+                        await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
                     }
-
-                    // Remove message from DLQ to processing...
-
-                    //syncService.UpdateDataAsync(message).GetAwaiter().GetResult();
-                    //brokerMessage.Complete();
                 }
                 else
                 {
@@ -105,7 +106,6 @@ namespace DeadletterQueue.Providers
                         }
                     }
                 };
-                Console.WriteLine($"Sending Message with index: {index} - Filter '{brokerMessage.Header?.Flags?.ServiceBusFilter}'");
 
                 try
                 {
@@ -123,7 +123,7 @@ namespace DeadletterQueue.Providers
 
                     lock (Console.Out)
                     {
-                        Console.WriteLine("Sent: MessageId={0}", serviceBusMessage.MessageId);
+                        Console.WriteLine($"SENT {string.Format("{0:D3}", index)}: MessageId={serviceBusMessage.MessageId} - [{brokerMessage.StringData}]");
                     }
                 }
                 catch (Exception ex)
@@ -135,61 +135,6 @@ namespace DeadletterQueue.Providers
             }
 
             await sbSender.DisposeAsync();
-        }
-
-        public static async Task ExceedMaxDelivery(ServiceBus serviceBusConfiguration)
-        {
-            ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
-
-            string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
-            string subscriptionName = subscriptionKey + deadletterQueuePath;
-
-            ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName,
-                new ServiceBusReceiverOptions()
-                {
-                    ReceiveMode = ServiceBusReceiveMode.PeekLock
-                });
-            //var receiver = await receiverFactory.CreateMessageReceiverAsync(queueName, ReceiveMode.PeekLock);
-
-            while (true)
-            {
-                ServiceBusReceivedMessage msg = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500));
-
-                if (msg != null)
-                {
-                    Console.WriteLine("Picked up message; DeliveryCount {0}", msg.DeliveryCount);
-                    //await msg.AbandonAsync();
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            //var deadletterReceiver = await sbClient.CreateReceiver(QueueClient.FormatDeadLetterPath(queueName), ReceiveMode.PeekLock);
-
-            //while (true)
-            //{
-            //    var msg = await deadletterReceiver.ReceiveAsync(TimeSpan.Zero);
-
-            //    if (msg != null)
-            //    {
-            //        Console.WriteLine("Deadletter message:");
-            //        foreach (var prop in msg.Properties)
-            //        {
-            //            Console.WriteLine("{0}={1}", prop.Key, prop.Value);
-            //        }
-            //        await msg.CompleteAsync();
-            //    }
-            //    else
-            //    {
-            //        break;
-            //    }
-            //}
-
-            //var deadletterReceiver = await sbClient.CreateReceiver(QueueClient.FormatDeadLetterPath(queueName), ReceiveMode.PeekLock);
-
-
         }
     }
 }

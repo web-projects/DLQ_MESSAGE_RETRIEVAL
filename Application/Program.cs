@@ -29,9 +29,6 @@ namespace DeadletterQueue
                 // Write messages to DLQ
                 await DLQMessageProcessor.WriteDLQMessages(serviceBus).ConfigureAwait(false);
 
-                // Wait for DLQ messages to build
-                //await DLQMessageProcessor.ExceedMaxDelivery(serviceBus).ConfigureAwait(false);
-
                 // Wait for DLQ messages to post
                 Console.Write($"\r\nWaiting {serviceBus.DeadLetterQueueCheckSec} seconds for messages to expire");
 
@@ -40,6 +37,10 @@ namespace DeadletterQueue
                     Console.Write(".");
                     await Task.Delay(1000);
                 }
+                Console.WriteLine("*\r\n");
+
+                // We need this wait to demo the removal of DLQ messages
+                await Task.Delay(5000);
 
                 // Read messages from DLQ
                 await DLQMessageProcessor.ReadDLQMessages(serviceBus).ConfigureAwait(false);
@@ -49,10 +50,6 @@ namespace DeadletterQueue
                 Console.WriteLine(ex.Message);
                 throw;
             }
-            //finally
-            //{
-            //    documentClient.Dispose();
-            //}
 
             Console.WriteLine("\r\nAll message read successfully from Deadletter queue");
 

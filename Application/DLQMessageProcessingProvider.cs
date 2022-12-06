@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace DLQ.MessageRetrieval
+﻿namespace DLQ.MessageRetrieval
 {
     public class DLQMessageProcessingProvider
     {
