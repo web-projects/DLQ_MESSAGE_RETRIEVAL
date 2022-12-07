@@ -1,5 +1,5 @@
 ﻿using Azure.Messaging.ServiceBus;
-using DLQ.MessageRetrieval.Configuration;
+using DLQ.MessageRetrieval.Configuration.ChannelConfig;
 using DLQ.MessageRetrieval.Messages;
 using DLQ.MessageRetrieval.Providers;
 using DLQ.MessageRetrieval.Utilities;
@@ -62,7 +62,7 @@ namespace DeadletterQueue.Providers
                         }
 
                         // Peform resources and task cleanup
-                        // ToDO
+                        // ToDO: send dead-letter-queue messages to reprocessing?
 
                         // Remove message from DLQ to processing...
                         await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);

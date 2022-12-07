@@ -1,5 +1,5 @@
 ﻿using Azure.Messaging.ServiceBus.Administration;
-using DLQ.MessageRetrieval.Configuration;
+using DLQ.MessageRetrieval.Configuration.ChannelConfig;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;

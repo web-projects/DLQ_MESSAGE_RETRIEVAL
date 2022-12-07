@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DLQ.MessageRetrieval.Configuration
+namespace DLQ.MessageRetrieval.Configuration.ChannelConfig
 {
     [Serializable]
     public class Servers
