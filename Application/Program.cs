@@ -21,6 +21,9 @@ namespace DeadletterQueue
         
         const uint SW_RESTORE = 9;
 
+        const int SW_HIDE = 0;
+        const int SW_SHOW = 5;
+
         [StructLayout(LayoutKind.Sequential)]
         struct POINT
         {
@@ -53,6 +56,9 @@ namespace DeadletterQueue
             }
         }
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool AllocConsole();
+
         [DllImport("kernel32")]
         static extern IntPtr GetConsoleWindow();
 
@@ -65,6 +71,9 @@ namespace DeadletterQueue
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern bool SetWindowPlacement(IntPtr hWnd, [In] ref WINDOWPLACEMENT lpwndpl);
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
         #endregion --- WIN_API ---
 
         static private AppConfig configuration;
@@ -132,6 +141,16 @@ namespace DeadletterQueue
             {
                 configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed = Guid.NewGuid().ToString();
                 AppSettingsUpdate();
+            }
+
+            // Show Window
+            if (Handle == IntPtr.Zero)
+            {
+                AllocConsole();
+            }
+            else
+            {
+                ShowWindow(Handle, SW_SHOW);
             }
 
             SetWindowPosition();
