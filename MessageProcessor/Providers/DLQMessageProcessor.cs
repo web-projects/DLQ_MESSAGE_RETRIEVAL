@@ -20,6 +20,7 @@ namespace DLQ.MessageProvider.Providers
         private static string subscriptionKey;
 
         private static List<SubscriptionDescription> subscriptionDescriptions = new List<SubscriptionDescription>();
+        private static List<SubscriptionDescription> subscriptionDescriptionsWorker = new List<SubscriptionDescription>();
 
         private static BrokerMessage GetBrokerMessageFromBinaryData(BinaryData messageBinaryData)
             => (BrokerMessage)ArrayUtils.FromByteArray(messageBinaryData.ToArray());
@@ -33,74 +34,104 @@ namespace DLQ.MessageProvider.Providers
 
         public static async Task<bool> GetTopicSubscriptions(ServiceBus serviceBusConfiguration)
         {
-            ManagementClient managementClient = new ManagementClient(serviceBusConfiguration.ManagementConnectionString);
-
-            for (int skip = 0; skip < 1000; skip += 100)
+            if (subscriptionDescriptionsWorker.Count() == 0)
             {
-                IList<SubscriptionDescription> subscriptions = await managementClient.GetSubscriptionsAsync(serviceBusConfiguration.Topic, 100, skip);
+                ManagementClient managementClient = new ManagementClient(serviceBusConfiguration.ManagementConnectionString);
 
-                if (!subscriptions.Any())
+                for (int skip = 0; skip < 1000; skip += 100)
                 {
-                    break;
+                    IList<SubscriptionDescription> subscriptions = await managementClient.GetSubscriptionsAsync(serviceBusConfiguration.Topic, 100, skip);
+
+                    if (!subscriptions.Any())
+                    {
+                        break;
+                    }
+
+                    subscriptionDescriptions.AddRange(subscriptions);
                 }
 
-                subscriptionDescriptions.AddRange(subscriptions);
+                subscriptionDescriptionsWorker = subscriptionDescriptions;
             }
 
             return subscriptionDescriptions.Count() > 0;
         }
 
-        public static async Task ReadDLQMessages(ServiceBus serviceBusConfiguration)
+        public static async Task<bool> ReadDLQMessages(ServiceBus serviceBusConfiguration)
         {
-            ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
-
-            foreach (SubscriptionDescription subcriptionDescription in subscriptionDescriptions)
+            if (subscriptionDescriptionsWorker.Count() == 0)
             {
-                string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
-                string subscriptionName = subcriptionDescription.SubscriptionName + deadletterQueuePath;
+                return false;
+            }
 
-                Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
-                Debug.WriteLine($"DLQ subscription: {subscriptionName}");
+            int counter = 0;
+            SubscriptionDescription subcriptionDescription = subscriptionDescriptionsWorker.First();
 
-                // DLQ Subscription
-                ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName);
-
-                int counter = 0;
-
-                Console.WriteLine($"Processing DLQ messages for Subscription: '{subcriptionDescription.SubscriptionName}' ...");
-
-                while (true)
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(subcriptionDescription.SubscriptionName))
                 {
-                    ServiceBusReceivedMessage brokerDLQMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                    string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
+                    string subscriptionName = subcriptionDescription.SubscriptionName + deadletterQueuePath;
 
-                    if (brokerDLQMessage is { })
+                    Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
+                    Debug.WriteLine($"DLQ subscription: {subscriptionName}");
+
+                    // DLQ Subscription
+                    ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
+                    ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName);
+
+                    Console.WriteLine($"Processing DLQ messages for Subscription: '{subcriptionDescription.SubscriptionName}' ...");
+
+                    while (true)
                     {
-                        Console.WriteLine($"{string.Format("{0:D3}", counter++)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
+                        ServiceBusReceivedMessage brokerDLQMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
 
-                        BrokerMessage brokerMessage = GetBrokerMessageFromBinaryData(brokerDLQMessage.Body);
-
-                        if (brokerMessage is { })
+                        if (brokerDLQMessage is { })
                         {
-                            lock (Console.Out)
+                            Console.WriteLine($"{string.Format("{0:D3}", counter++)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
+
+                            BrokerMessage brokerMessage = GetBrokerMessageFromBinaryData(brokerDLQMessage.Body);
+
+                            if (brokerMessage is { })
                             {
-                                Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{brokerMessage.StringData}]");
+                                lock (Console.Out)
+                                {
+                                    Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{brokerMessage.StringData}]");
+                                }
+
+                                // Peform resources and task cleanup
+                                // ToDO: send dead-letter-queue messages to reprocessing?
+
+                                // Remove message from DLQ to processing...
+                                await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
                             }
-
-                            // Peform resources and task cleanup
-                            // ToDO: send dead-letter-queue messages to reprocessing?
-
-                            // Remove message from DLQ to processing...
-                            await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            break;
                         }
                     }
-                    else
-                    {
-                        break;
-                    }
-                }
 
-                await sbReceiver.DisposeAsync();
+                    await sbReceiver.DisposeAsync();
+
+                    // Delete last entry in the worker
+                    subscriptionDescriptionsWorker.Remove(subcriptionDescription);
+                }
             }
+            catch (ServiceBusException e)
+            {
+                Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
+                if (e.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
+                {
+                    subscriptionDescriptionsWorker.Remove(subcriptionDescription);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Exception in DLQ Provider - Message={ex.Message}");
+            }
+
+            return counter > 0;
         }
 
         /// <summary>
@@ -116,7 +147,7 @@ namespace DLQ.MessageProvider.Providers
             // send messages to topic: listener-client-seek-dev
             ServiceBusSender sbSender = sbClient.CreateSender(serviceBusConfiguration.Topic);
 
-            Console.WriteLine($"Sending messages to topic '{serviceBusConfiguration.Topic}'...");
+            Console.WriteLine($"Sending messages to Topic '{serviceBusConfiguration.Topic}' for Subscription '{subscriptionKey}' ...");
 
             // send several messages to the queue
             for (int index = 0; index < MaxMessagestoSend; index++)

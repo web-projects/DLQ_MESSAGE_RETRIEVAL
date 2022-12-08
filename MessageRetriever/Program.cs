@@ -1,6 +1,8 @@
 ﻿using DLQ.Common.Configuration;
+using DLQ.Common.Configuration.BackgroundConfig;
 using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.MessageProvider.Providers;
+using DLQ.MessageRetriever.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Diagnostics;
@@ -86,17 +88,8 @@ namespace DeadletterQueue
 
                 ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
-                // Get Current Subscription List
-                if (await DLQMessageProcessor.GetTopicSubscriptions(serviceBus).ConfigureAwait(false))
-                {
-                    // Read messages from DLQ
-                    await DLQMessageProcessor.ReadDLQMessages(serviceBus).ConfigureAwait(false);
-                    Console.WriteLine("\r\nAll message read successfully from Deadletter queue");
-                }
-                else
-                {
-                    Console.WriteLine($"\r\nNo subscriptions found for Topic: {serviceBus.Topic}");
-                }
+                // Setup background
+                MessageRetrieverProvider.StartBackgroundTask(serviceBus, configuration.BackgroundTask.RefreshTimerSec);
             }
             catch (Exception ex)
             {
@@ -104,10 +97,14 @@ namespace DeadletterQueue
                 throw;
             }
 
-            Console.WriteLine("Press <ENTER> to end.");
+            Console.WriteLine($"DLQ Message Processor Background Service Started with a {configuration.BackgroundTask.RefreshTimerSec} Sec Interval.");
+            Console.WriteLine("Press <ENTER> to end.\r\n");
             Console.ReadLine();
 
-            SaveWindowPosition();
+            // clean up task
+            MessageRetrieverProvider.StopBackgroundTask();
+
+           SaveWindowPosition();
         }
 
         private static void SetupEnvironment()
