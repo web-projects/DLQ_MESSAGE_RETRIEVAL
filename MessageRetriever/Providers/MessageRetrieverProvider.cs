@@ -54,6 +54,10 @@ namespace DLQ.MessageRetriever.Providers
                     {
                         Console.WriteLine("All messages processed successfully from Deadletter queue.");
                     }
+                    else
+                    {
+                        Console.WriteLine("No messages to process in DLQ found.");
+                    }
                     Console.WriteLine();
                 }
                 else

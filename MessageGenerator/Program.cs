@@ -121,11 +121,9 @@ namespace DeadletterQueue
                 .Build()
                 .Get<AppConfig>();
 
-            if (string.IsNullOrEmpty(configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed))
-            {
-                configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed = Guid.NewGuid().ToString();
-                AppSettingsUpdate();
-            }
+            // Always refresh the FilterName for each generating instance
+            configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed = Guid.NewGuid().ToString();
+            AppSettingsUpdate();
 
             // Show Window
             if (Handle == IntPtr.Zero)

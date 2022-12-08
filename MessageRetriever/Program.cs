@@ -1,7 +1,5 @@
 ﻿using DLQ.Common.Configuration;
-using DLQ.Common.Configuration.BackgroundConfig;
 using DLQ.Common.Configuration.ChannelConfig;
-using DLQ.MessageProvider.Providers;
 using DLQ.MessageRetriever.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
@@ -80,7 +78,7 @@ namespace DeadletterQueue
 
         static private AppConfig configuration;
 
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
             try
             {
@@ -104,7 +102,7 @@ namespace DeadletterQueue
             // clean up task
             MessageRetrieverProvider.StopBackgroundTask();
 
-           SaveWindowPosition();
+            SaveWindowPosition();
         }
 
         private static void SetupEnvironment()
@@ -121,12 +119,6 @@ namespace DeadletterQueue
                 .AddEnvironmentVariables()
                 .Build()
                 .Get<AppConfig>();
-
-            if (string.IsNullOrEmpty(configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed))
-            {
-                configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed = Guid.NewGuid().ToString();
-                AppSettingsUpdate();
-            }
 
             // Show Window
             if (Handle == IntPtr.Zero)
