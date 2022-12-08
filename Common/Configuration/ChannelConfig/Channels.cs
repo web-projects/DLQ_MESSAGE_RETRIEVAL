@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace DLQ.MessageRetrieval.Configuration.ChannelConfig
+namespace DLQ.Common.Configuration.ChannelConfig
 {
     [Serializable]
     public class Channels

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DLQ.MessageRetrieval.Messages
+namespace DLQ.MessageProcessor.Messages
 {
     [Serializable]
     public class BrokerMessage

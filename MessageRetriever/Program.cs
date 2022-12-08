@@ -1,6 +1,6 @@
-﻿using DeadletterQueue.Providers;
-using DLQ.MessageRetrieval.Configuration;
-using DLQ.MessageRetrieval.Configuration.ChannelConfig;
+﻿using DLQ.Common.Configuration;
+using DLQ.Common.Configuration.ChannelConfig;
+using DLQ.MessageProvider.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Diagnostics;
@@ -18,7 +18,7 @@ namespace DeadletterQueue
         #region --- WIN_API ---
         const int SWP_NOZORDER = 0x4;
         const int SWP_NOACTIVATE = 0x10;
-        
+
         const uint SW_RESTORE = 9;
 
         const int SW_HIDE = 0;
@@ -86,35 +86,23 @@ namespace DeadletterQueue
 
                 ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
-                // FilterRule name
-                string filterRuleName = await DLQMessageProcessor.CreateFilterRule(serviceBus);
-
-                // Write messages to DLQ
-                await DLQMessageProcessor.WriteDLQMessages(serviceBus).ConfigureAwait(false);
-
-                // Wait for DLQ messages to post
-                Console.Write($"\r\nWaiting {serviceBus.DeadLetterQueueCheckSec} seconds for messages to expire");
-
-                for (int i = 0; i < serviceBus.DeadLetterQueueCheckSec; i++)
+                // Get Current Subscription List
+                if (await DLQMessageProcessor.GetTopicSubscriptions(serviceBus).ConfigureAwait(false))
                 {
-                    Console.Write(".");
-                    await Task.Delay(1000);
+                    // Read messages from DLQ
+                    await DLQMessageProcessor.ReadDLQMessages(serviceBus).ConfigureAwait(false);
+                    Console.WriteLine("\r\nAll message read successfully from Deadletter queue");
                 }
-                Console.WriteLine("*\r\n");
-
-                // We need this wait to demo the removal of DLQ messages
-                await Task.Delay(5000);
-
-                // Read messages from DLQ
-                await DLQMessageProcessor.ReadDLQMessages(serviceBus).ConfigureAwait(false);
+                else
+                {
+                    Console.WriteLine($"\r\nNo subscriptions found for Topic: {serviceBus.Topic}");
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
                 throw;
             }
-
-            Console.WriteLine("\r\nAll message read successfully from Deadletter queue");
 
             Console.WriteLine("Press <ENTER> to end.");
             Console.ReadLine();
@@ -163,9 +151,9 @@ namespace DeadletterQueue
             // cx: width of window
             // cy: height of window
 
-            SetWindowPos(Handle, IntPtr.Zero, 
+            SetWindowPos(Handle, IntPtr.Zero,
                 configuration.Application.WindowsPosition.Left, configuration.Application.WindowsPosition.Top,
-                configuration.Application.WindowsPosition.Right - configuration.Application.WindowsPosition.Left, 
+                configuration.Application.WindowsPosition.Right - configuration.Application.WindowsPosition.Left,
                 configuration.Application.WindowsPosition.Bottom - configuration.Application.WindowsPosition.Top,
                 SWP_NOZORDER | SWP_NOACTIVATE);
         }
@@ -177,7 +165,7 @@ namespace DeadletterQueue
 
             // Get information about this window's current placement.
             WINDOWPLACEMENT wp = WINDOWPLACEMENT.Default;
-            
+
             GetWindowPlacement(hWnd, ref wp);
 
             configuration.Application.WindowsPosition.Top = wp.NormalPosition.Top;

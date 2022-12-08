@@ -1,13 +1,15 @@
 ﻿using Azure.Messaging.ServiceBus;
-using DLQ.MessageRetrieval.Configuration.ChannelConfig;
-using DLQ.MessageRetrieval.Messages;
-using DLQ.MessageRetrieval.Providers;
-using DLQ.MessageRetrieval.Utilities;
+using DLQ.Common.Configuration.ChannelConfig;
+using DLQ.Common.Utilities;
+using DLQ.MessageProcessor.Messages;
+using Microsoft.Azure.ServiceBus.Management;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 
-namespace DeadletterQueue.Providers
+namespace DLQ.MessageProvider.Providers
 {
     public static class DLQMessageProcessor
     {
@@ -16,6 +18,8 @@ namespace DeadletterQueue.Providers
 
         private static string filterRuleName;
         private static string subscriptionKey;
+
+        private static List<SubscriptionDescription> subscriptionDescriptions = new List<SubscriptionDescription>();
 
         private static BrokerMessage GetBrokerMessageFromBinaryData(BinaryData messageBinaryData)
             => (BrokerMessage)ArrayUtils.FromByteArray(messageBinaryData.ToArray());
@@ -27,54 +31,76 @@ namespace DeadletterQueue.Providers
             return filterRuleName;
         }
 
+        public static async Task<bool> GetTopicSubscriptions(ServiceBus serviceBusConfiguration)
+        {
+            ManagementClient managementClient = new ManagementClient(serviceBusConfiguration.ManagementConnectionString);
+
+            for (int skip = 0; skip < 1000; skip += 100)
+            {
+                IList<SubscriptionDescription> subscriptions = await managementClient.GetSubscriptionsAsync(serviceBusConfiguration.Topic, 100, skip);
+
+                if (!subscriptions.Any())
+                {
+                    break;
+                }
+
+                subscriptionDescriptions.AddRange(subscriptions);
+            }
+
+            return subscriptionDescriptions.Count() > 0;
+        }
+
         public static async Task ReadDLQMessages(ServiceBus serviceBusConfiguration)
         {
             ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
 
-            string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
-            string subscriptionName = subscriptionKey + deadletterQueuePath;
-
-            Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
-            Debug.WriteLine($"DLQ subscription: {subscriptionName}");
-
-            // DLQ Subscription
-            ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName);
-
-            int counter = 0;
-
-            Console.WriteLine("Processing DLQ messages...");
-
-            while (true)
+            foreach (SubscriptionDescription subcriptionDescription in subscriptionDescriptions)
             {
-                ServiceBusReceivedMessage brokerDLQMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
+                string subscriptionName = subcriptionDescription.SubscriptionName + deadletterQueuePath;
 
-                if (brokerDLQMessage is { })
+                Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
+                Debug.WriteLine($"DLQ subscription: {subscriptionName}");
+
+                // DLQ Subscription
+                ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName);
+
+                int counter = 0;
+
+                Console.WriteLine($"Processing DLQ messages for Subscription: '{subcriptionDescription.SubscriptionName}' ...");
+
+                while (true)
                 {
-                    Console.WriteLine($"{string.Format("{0:D3}", counter++)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
+                    ServiceBusReceivedMessage brokerDLQMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
 
-                    BrokerMessage brokerMessage = GetBrokerMessageFromBinaryData(brokerDLQMessage.Body);
-
-                    if (brokerMessage is { })
+                    if (brokerDLQMessage is { })
                     {
-                        lock (Console.Out)
+                        Console.WriteLine($"{string.Format("{0:D3}", counter++)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
+
+                        BrokerMessage brokerMessage = GetBrokerMessageFromBinaryData(brokerDLQMessage.Body);
+
+                        if (brokerMessage is { })
                         {
-                            Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{brokerMessage.StringData}]");
+                            lock (Console.Out)
+                            {
+                                Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{brokerMessage.StringData}]");
+                            }
+
+                            // Peform resources and task cleanup
+                            // ToDO: send dead-letter-queue messages to reprocessing?
+
+                            // Remove message from DLQ to processing...
+                            await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
                         }
-
-                        // Peform resources and task cleanup
-                        // ToDO: send dead-letter-queue messages to reprocessing?
-
-                        // Remove message from DLQ to processing...
-                        await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        break;
                     }
                 }
-                else
-                {
-                    break;
-                }
-            }
 
-            await sbReceiver.DisposeAsync();
+                await sbReceiver.DisposeAsync();
+            }
         }
 
         /// <summary>

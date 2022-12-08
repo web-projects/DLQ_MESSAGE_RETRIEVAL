@@ -1,8 +1,8 @@
-﻿using DLQ.MessageRetrieval.Configuration.ApplicationConfig;
-using DLQ.MessageRetrieval.Configuration.ChannelConfig;
+﻿using DLQ.Common.Configuration.ApplicationConfig;
+using DLQ.Common.Configuration.ChannelConfig;
 using System;
 
-namespace DLQ.MessageRetrieval.Configuration
+namespace DLQ.Common.Configuration
 {
     [Serializable]
     public class AppConfig

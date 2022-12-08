@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DLQ.MessageRetrieval.Configuration.ApplicationConfig
+namespace DLQ.Common.Configuration.ApplicationConfig
 {
     [Serializable]
     public class WindowsPosition

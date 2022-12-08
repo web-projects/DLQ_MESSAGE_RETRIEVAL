@@ -1,10 +1,10 @@
 ﻿using Azure.Messaging.ServiceBus.Administration;
-using DLQ.MessageRetrieval.Configuration.ChannelConfig;
+using DLQ.Common.Configuration.ChannelConfig;
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
-namespace DLQ.MessageRetrieval.Providers
+namespace DLQ.MessageProvider.Providers
 {
     public static class SubscriptionFilter
     {

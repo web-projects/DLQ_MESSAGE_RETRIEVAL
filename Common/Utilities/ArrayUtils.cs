@@ -2,7 +2,7 @@
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 
-namespace DLQ.MessageRetrieval.Utilities
+namespace DLQ.Common.Utilities
 {
     public class ArrayUtils
     {

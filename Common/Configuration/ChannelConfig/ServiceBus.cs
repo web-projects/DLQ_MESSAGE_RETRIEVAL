@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DLQ.MessageRetrieval.Configuration.ChannelConfig
+namespace DLQ.Common.Configuration.ChannelConfig
 {
     [Serializable]
     public class ServiceBus

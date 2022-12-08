@@ -1,0 +1,57 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.33027.164
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DLQ.MessageGenerator", "MessageGenerator\DLQ.MessageGenerator.csproj", "{D5D0566D-AF5A-4000-A406-D537C9F59172}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MessageGenerator", "MessageGenerator", "{0B6BDA8E-71F0-4A4F-9FD7-EF6F7C135707}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MessageRetriever", "MessageRetriever", "{40F9C9DA-921A-46E3-A775-8F40370846D5}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DLQ.MessageRetriever", "MessageRetriever\DLQ.MessageRetriever.csproj", "{76E5B62B-0A21-4423-AB48-780861404A9C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{DABCE0B2-9B80-4583-BD89-1D32047BFF43}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DLQ.Common", "Common\DLQ.Common.csproj", "{DCC17846-13EF-4766-9905-C8EB111A9F75}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MessageProcessor", "MessageProcessor", "{BBDB07AE-F9C3-4A32-8EAA-DB5883697D08}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DLQ.MessageProcessor", "MessageProcessor\DLQ.MessageProcessor.csproj", "{0A4F0CAD-48B9-4B49-8FDF-02255AFDA257}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D5D0566D-AF5A-4000-A406-D537C9F59172}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D5D0566D-AF5A-4000-A406-D537C9F59172}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5D0566D-AF5A-4000-A406-D537C9F59172}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5D0566D-AF5A-4000-A406-D537C9F59172}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76E5B62B-0A21-4423-AB48-780861404A9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76E5B62B-0A21-4423-AB48-780861404A9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76E5B62B-0A21-4423-AB48-780861404A9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76E5B62B-0A21-4423-AB48-780861404A9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DCC17846-13EF-4766-9905-C8EB111A9F75}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DCC17846-13EF-4766-9905-C8EB111A9F75}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DCC17846-13EF-4766-9905-C8EB111A9F75}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DCC17846-13EF-4766-9905-C8EB111A9F75}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A4F0CAD-48B9-4B49-8FDF-02255AFDA257}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A4F0CAD-48B9-4B49-8FDF-02255AFDA257}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A4F0CAD-48B9-4B49-8FDF-02255AFDA257}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A4F0CAD-48B9-4B49-8FDF-02255AFDA257}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{D5D0566D-AF5A-4000-A406-D537C9F59172} = {0B6BDA8E-71F0-4A4F-9FD7-EF6F7C135707}
+		{76E5B62B-0A21-4423-AB48-780861404A9C} = {40F9C9DA-921A-46E3-A775-8F40370846D5}
+		{DCC17846-13EF-4766-9905-C8EB111A9F75} = {DABCE0B2-9B80-4583-BD89-1D32047BFF43}
+		{0A4F0CAD-48B9-4B49-8FDF-02255AFDA257} = {BBDB07AE-F9C3-4A32-8EAA-DB5883697D08}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {14368C2B-60EB-4857-9E79-D9822E81AD2C}
+	EndGlobalSection
+EndGlobal
