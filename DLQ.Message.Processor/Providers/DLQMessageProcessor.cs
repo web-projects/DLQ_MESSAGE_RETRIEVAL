@@ -13,9 +13,6 @@ namespace DLQ.MessageProvider.Providers
 {
     public static class DLQMessageProcessor
     {
-        private const int MaxMessagestoSend = 10;
-        private const int MaxWaitforMessageInDLQinMS = 5000;
-
         private static string filterRuleName;
         private static string subscriptionKey;
 
@@ -25,14 +22,21 @@ namespace DLQ.MessageProvider.Providers
         private static BrokerMessage GetBrokerMessageFromBinaryData(BinaryData messageBinaryData)
             => (BrokerMessage)ArrayUtils.FromByteArray(messageBinaryData.ToArray());
 
-        public static async Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration)
+        public static List<SubscriptionDescription> GetTopicSubscriptions()
+            => subscriptionDescriptions;
+
+        public static async Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool resetSubscriptionKey)
         {
+            if (resetSubscriptionKey)
+            {
+                SubscriptionFilter.ResetSubscriptionKey();
+            }
             filterRuleName = await SubscriptionFilter.SetFilter(serviceBusConfiguration).ConfigureAwait(false);
             subscriptionKey = SubscriptionFilter.GetSubscriptionKey();
             return filterRuleName;
         }
 
-        public static async Task<bool> GetTopicSubscriptions(ServiceBus serviceBusConfiguration)
+        public static async Task<bool> HasTopicSubscriptions(ServiceBus serviceBusConfiguration)
         {
             if (subscriptionDescriptionsWorker.Count() == 0)
             {
@@ -51,6 +55,8 @@ namespace DLQ.MessageProvider.Providers
                 }
 
                 subscriptionDescriptionsWorker = subscriptionDescriptions;
+
+                Console.WriteLine($"Topic [{serviceBusConfiguration.Topic}] has {subscriptionDescriptions.Count()} active subscriptions.\r\n");
             }
 
             return subscriptionDescriptions.Count() > 0;
@@ -140,7 +146,7 @@ namespace DLQ.MessageProvider.Providers
         /// <param name="serviceBusConfiguration"></param>
         /// <param name="log"></param>
         /// <returns></returns>
-        public static async Task WriteDLQMessages(ServiceBus serviceBusConfiguration)
+        public static async Task WriteDLQMessages(ServiceBus serviceBusConfiguration, int NumberofMessagestoSend)
         {
             ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
 
@@ -150,7 +156,7 @@ namespace DLQ.MessageProvider.Providers
             Console.WriteLine($"Sending messages to Topic '{serviceBusConfiguration.Topic}' for Subscription '{subscriptionKey}' ...");
 
             // send several messages to the queue
-            for (int index = 0; index < MaxMessagestoSend; index++)
+            for (int index = 0; index < NumberofMessagestoSend; index++)
             {
                 BrokerMessage brokerMessage = new BrokerMessage()
                 {
@@ -192,6 +198,71 @@ namespace DLQ.MessageProvider.Providers
             }
 
             await sbSender.DisposeAsync();
+        }
+
+        public static async Task ProcessMessagesInSubscription(ServiceBus serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess)
+        {
+            int counter = 0;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(subscriptionName) && numberMessagesToProcess > 0)
+                {
+                    Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
+                    Debug.WriteLine($"DLQ subscription: {subscriptionName}");
+
+                    // DLQ Subscription
+                    ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
+                    ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName,
+                        new ServiceBusReceiverOptions() 
+                        { 
+                            PrefetchCount = numberMessagesToProcess,
+                            ReceiveMode = ServiceBusReceiveMode.PeekLock
+                        });
+
+                    Console.WriteLine($"Processing DLQ messages for Subscription: '{subscriptionName}' ...");
+
+                    while (true)
+                    {
+                        ServiceBusReceivedMessage brokerActiveMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+
+                        if (brokerActiveMessage is { })
+                        {
+                            BrokerMessage brokerMessage = GetBrokerMessageFromBinaryData(brokerActiveMessage.Body);
+
+                            if (brokerMessage is { })
+                            {
+                                lock (Console.Out)
+                                {
+                                    Console.WriteLine($"{string.Format("{0:D3}", ++counter)} Message: MessageId={brokerActiveMessage.MessageId} - [{brokerMessage.StringData}]");
+                                }
+
+                                // Remove message from Active List
+                                await sbReceiver.CompleteMessageAsync(brokerActiveMessage).ConfigureAwait(false);
+                            }
+
+                            if (counter == numberMessagesToProcess)
+                            {
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+
+                    await sbReceiver.DisposeAsync();
+                }
+            }
+            catch (ServiceBusException e)
+            {
+                Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Exception in DLQ Provider - Message={ex.Message}");
+            }
         }
     }
 }

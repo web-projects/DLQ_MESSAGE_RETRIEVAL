@@ -3,7 +3,6 @@ using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.MessageProvider.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -84,13 +83,22 @@ namespace DeadletterQueue
             {
                 SetupEnvironment();
 
-                ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
+                while (true)
+                {
+                    await RunIterations();
 
-                // FilterRule name
-                string filterRuleName = await DLQMessageProcessor.CreateFilterRule(serviceBus);
+                    Console.WriteLine("\r\nAll messages sent --- expect them in DLQ within 60 seconds");
 
-                // Write messages to DLQ
-                await DLQMessageProcessor.WriteDLQMessages(serviceBus).ConfigureAwait(false);
+                    Console.WriteLine("Press <ENTER> to repeat iteration(s) - <ESC> to END.");
+                    ConsoleKeyInfo keyInfo = Console.ReadKey();
+
+                    if (keyInfo.Key == ConsoleKey.Escape)
+                    {
+                        break;
+                    }
+
+                    Console.WriteLine();
+                }
             }
             catch (Exception ex)
             {
@@ -98,12 +106,28 @@ namespace DeadletterQueue
                 throw;
             }
 
-            Console.WriteLine("\r\nAll messages sent --- expect them in DLQ within 60 seconds");
-
-            Console.WriteLine("Press <ENTER> to end.");
-            Console.ReadLine();
-
             SaveWindowPosition();
+        }
+
+        private static async Task RunIterations()
+        {
+            ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
+
+            for (int index = 0; index < configuration.Application.TotalIterations; index++)
+            {
+                // Always refresh the FilterName for each generating instance
+                configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed = Guid.NewGuid().ToString();
+                AppSettingsUpdate();
+
+                Console.WriteLine(string.Format("{0:D3} Iteration with ConnectionId '{{{1}}}'",
+                    index + 1, configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed));
+
+                // FilterRule name
+                string filterRuleName = await DLQMessageProcessor.CreateFilterRule(serviceBus, true);
+
+                // Write messages to DLQ
+                await DLQMessageProcessor.WriteDLQMessages(serviceBus, configuration.Application.NumberofMessagestoSend).ConfigureAwait(false);
+            }
         }
 
         private static void SetupEnvironment()
@@ -120,10 +144,6 @@ namespace DeadletterQueue
                 .AddEnvironmentVariables()
                 .Build()
                 .Get<AppConfig>();
-
-            // Always refresh the FilterName for each generating instance
-            configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed = Guid.NewGuid().ToString();
-            AppSettingsUpdate();
 
             // Show Window
             if (Handle == IntPtr.Zero)
@@ -191,7 +211,7 @@ namespace DeadletterQueue
                 jsonWriteOptions.Converters.Add(new JsonStringEnumConverter());
 
                 string newJson = JsonSerializer.Serialize(configuration, jsonWriteOptions);
-                Debug.WriteLine($"{newJson}");
+                //Debug.WriteLine($"{newJson}");
 
                 string appSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
                 File.WriteAllText(appSettingsPath, newJson);

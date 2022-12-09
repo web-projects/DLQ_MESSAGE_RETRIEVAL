@@ -22,6 +22,9 @@ namespace DLQ.MessageProvider.Providers
         public static string GetSubscriptionKey()
             => SubscriptionKey;
 
+        public static void ResetSubscriptionKey()
+            => instanceSubscriptionKey = string.Empty;
+
         public static async Task<string> SetFilter(ServiceBus configuration)
         {
             serviceBusConfiguration = configuration;

@@ -12,6 +12,7 @@ namespace DLQ.MessageRetriever.Providers
     public static class MessageRetrieverProvider
     {
         private static int iterationCount = 0;
+
         private static Timer refreshTimer;
         private static int timeoutDelayMs;
         private static ServiceBus serviceBusConfig;
@@ -31,14 +32,15 @@ namespace DLQ.MessageRetriever.Providers
         static private void RegisterBackgroundTask(int timeoutDelay)
         {
             refreshTimer = new Timer(
-                               callback: async (state) => await RefreshTimer_ElapsedAsync(state),
-                               state: null,
-                               dueTime: timeoutDelay,
-                               period: timeoutDelay);
+                callback: async (state) => await DoWorkAsyc(state),
+                state: null,
+                dueTime: timeoutDelay,
+                period: timeoutDelay
+            );
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Required by delegate.")]
-        static private async Task RefreshTimer_ElapsedAsync(object state)
+        static private async Task DoWorkAsyc(object state)
         {
             refreshTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
@@ -47,7 +49,7 @@ namespace DLQ.MessageRetriever.Providers
             try
             {
                 // Get Current Subscription List
-                if (await DLQMessageProcessor.GetTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
+                if (await DLQMessageProcessor.HasTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
                 {
                     // Read messages from DLQ
                     if (await DLQMessageProcessor.ReadDLQMessages(serviceBusConfig).ConfigureAwait(false))

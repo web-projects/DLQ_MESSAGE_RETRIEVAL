@@ -1,9 +1,10 @@
 ﻿using DLQ.Common.Configuration;
 using DLQ.Common.Configuration.ChannelConfig;
-using DLQ.MessageRetriever.Providers;
+using DLQ.MessageProvider.Providers;
+using Microsoft.Azure.ServiceBus.Management;
 using Microsoft.Extensions.Configuration;
 using System;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -78,16 +79,26 @@ namespace DeadletterQueue
 
         static private AppConfig configuration;
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             try
             {
                 SetupEnvironment();
 
-                ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
+                while (true)
+                {
+                    await RunIterations();
 
-                // Setup background
-                MessageRetrieverProvider.StartBackgroundTask(serviceBus, configuration.BackgroundTask.RefreshTimerSec);
+                    Console.WriteLine("Press <ENTER> to repeat iteration(s) - <ESC> to END.");
+                    ConsoleKeyInfo keyInfo = Console.ReadKey();
+
+                    if (keyInfo.Key == ConsoleKey.Escape)
+                    {
+                        break;
+                    }
+
+                    Console.WriteLine();
+                }
             }
             catch (Exception ex)
             {
@@ -95,14 +106,27 @@ namespace DeadletterQueue
                 throw;
             }
 
-            Console.WriteLine($"DLQ Message Processor Background Service Started with a {configuration.BackgroundTask.RefreshTimerSec} Sec Interval.");
-            Console.WriteLine("Press <ENTER> to end.\r\n");
-            Console.ReadLine();
-
-            // clean up task
-            MessageRetrieverProvider.StopBackgroundTask();
-
             SaveWindowPosition();
+        }
+
+        private static async Task RunIterations()
+        {
+            ServiceBus serviceBusConfig = configuration.Channels.Servers.First().ServiceBus;
+            Random random = new Random();
+
+            // Get Current Subscription List
+            if (await DLQMessageProcessor.HasTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
+            {
+                List<SubscriptionDescription> subscriptionDescriptionList = DLQMessageProcessor.GetTopicSubscriptions();
+
+                foreach (SubscriptionDescription subscriptionDescription in subscriptionDescriptionList)
+                {
+                    int numberMessagesToProcess = random.Next(configuration.Application.NumberofMessagestoSend + 1);
+                    Console.WriteLine($"Subscription '{subscriptionDescription.SubscriptionName}': processing {numberMessagesToProcess} messages --- expect unprocessed messages in DLQ within 60 seconds");
+                    await DLQMessageProcessor.ProcessMessagesInSubscription(serviceBusConfig, subscriptionDescription.SubscriptionName, numberMessagesToProcess);
+                }
+                Console.WriteLine();
+            }
         }
 
         private static void SetupEnvironment()
@@ -186,7 +210,7 @@ namespace DeadletterQueue
                 jsonWriteOptions.Converters.Add(new JsonStringEnumConverter());
 
                 string newJson = JsonSerializer.Serialize(configuration, jsonWriteOptions);
-                Debug.WriteLine($"{newJson}");
+                //Debug.WriteLine($"{newJson}");
 
                 string appSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
                 File.WriteAllText(appSettingsPath, newJson);

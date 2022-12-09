@@ -10,6 +10,12 @@
   </PropertyGroup>
   
   <ItemGroup>
+    <Compile Remove="NewFolder\**" />
+    <EmbeddedResource Remove="NewFolder\**" />
+    <None Remove="NewFolder\**" />
+  </ItemGroup>
+  
+  <ItemGroup>
     <None Remove="README.md" />
   </ItemGroup>
   <ItemGroup>
@@ -26,11 +32,10 @@
     <PackageReference Include="System.Diagnostics.Debug" Version="4.3.0" />
     <PackageReference Include="System.Linq" Version="4.3.0" />
     <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
-    <PackageReference Include="TaskScheduler" Version="2.10.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\DLQ.Common.csproj" />
-    <ProjectReference Include="..\MessageProcessor\DLQ.MessageProcessor.csproj" />
+    <ProjectReference Include="..\DLQ.Message.Processor\DLQ.Message.Processor.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
