@@ -1,6 +1,6 @@
 ﻿using DLQ.Common.Configuration;
 using DLQ.Common.Configuration.ChannelConfig;
-using DLQ.MessageProvider.Providers;
+using DLQ.Message.Processor.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.IO;
@@ -10,7 +10,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-namespace DeadletterQueue
+namespace DLQ.Message.Client
 {
     static class Program
     {
@@ -89,7 +89,7 @@ namespace DeadletterQueue
 
                     Console.WriteLine("\r\nAll messages sent --- expect them in DLQ within 60 seconds");
 
-                    Console.WriteLine("Press <ENTER> to repeat iteration(s) - <ESC> to END.");
+                    Console.WriteLine("Press <ENTER> to repeat iteration(s) - <ESC> to EXIT.");
                     ConsoleKeyInfo keyInfo = Console.ReadKey();
 
                     if (keyInfo.Key == ConsoleKey.Escape)

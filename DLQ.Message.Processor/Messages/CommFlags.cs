@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DLQ.MessageProcessor.Messages
+namespace DLQ.Message.Processor.Messages
 {
     [Serializable]
     public class CommFlags

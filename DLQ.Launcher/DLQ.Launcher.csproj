@@ -10,16 +10,11 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <Compile Remove="NewFolder\**" />
-    <EmbeddedResource Remove="NewFolder\**" />
-    <None Remove="NewFolder\**" />
-  </ItemGroup>
-  
-  <ItemGroup>
     <None Remove="README.md" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.11.1" />
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="log4net" Version="2.0.15" />
     <PackageReference Include="Microsoft.Azure.ServiceBus" Version="5.2.0" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
@@ -29,16 +24,21 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="7.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+    <PackageReference Include="Ninject" Version="3.3.6" />
     <PackageReference Include="System.Diagnostics.Debug" Version="4.3.0" />
     <PackageReference Include="System.Linq" Version="4.3.0" />
     <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\DLQ.Common\DLQ.Common.csproj" />
     <ProjectReference Include="..\DLQ.Message.Processor\DLQ.Message.Processor.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.Production.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 </Project>

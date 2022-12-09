@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DLQ.Launcher": {
+      "commandName": "Project",
+      "commandLineArgs": "--solutionDir $(SolutionDir) --buildConfiguration $(Configuration) --beta true"
+    }
+  }
+}

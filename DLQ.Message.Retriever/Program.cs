@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DeadletterQueue
+namespace DLQ.Message.Retriever
 {
     static class Program
     {
@@ -95,7 +95,7 @@ namespace DeadletterQueue
             }
 
             Console.WriteLine($"DLQ Message Processor Background Service Started with a {configuration.BackgroundTask.RefreshTimerSec} Sec Interval.");
-            Console.WriteLine("Press <ESC> to end.\r\n");
+            Console.WriteLine("Press <ESC> to EXIT.\r\n");
             Console.ReadLine();
 
             // clean up task

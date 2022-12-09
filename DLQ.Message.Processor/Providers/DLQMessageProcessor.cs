@@ -1,7 +1,8 @@
 ﻿using Azure.Messaging.ServiceBus;
 using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.Utilities;
-using DLQ.MessageProcessor.Messages;
+using DLQ.Message.Processor.Messages;
+using DLQ.Message.Provider.Providers;
 using Microsoft.Azure.ServiceBus.Management;
 using System;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace DLQ.MessageProvider.Providers
+namespace DLQ.Message.Processor.Providers
 {
     public static class DLQMessageProcessor
     {
@@ -214,8 +215,8 @@ namespace DLQ.MessageProvider.Providers
                     // DLQ Subscription
                     ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
                     ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName,
-                        new ServiceBusReceiverOptions() 
-                        { 
+                        new ServiceBusReceiverOptions()
+                        {
                             PrefetchCount = numberMessagesToProcess,
                             ReceiveMode = ServiceBusReceiveMode.PeekLock
                         });

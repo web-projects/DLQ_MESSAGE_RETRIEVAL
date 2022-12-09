@@ -4,7 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 
-namespace DLQ.MessageProvider.Providers
+namespace DLQ.Message.Provider.Providers
 {
     public static class SubscriptionFilter
     {

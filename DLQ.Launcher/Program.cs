@@ -1,18 +1,23 @@
 ﻿using DLQ.Common.Configuration;
-using DLQ.Common.Configuration.ChannelConfig;
-using DLQ.Message.Processor.Providers;
-using Microsoft.Azure.ServiceBus.Management;
+using DLQ.Common.Configuration.LauncherConfig;
+using DLQ.Launcher;
+using DLQ.Launcher.Core;
+using DLQ.Message.Launcher.Providers;
 using Microsoft.Extensions.Configuration;
+using Ninject;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using static DLQ.Message.Launcher.Providers.Constants;
 
-namespace DLQ.Message.Server
+namespace DLQ.Message.Launcher
 {
     static class Program
     {
@@ -79,26 +84,31 @@ namespace DLQ.Message.Server
 
         static private AppConfig configuration;
 
+        static private AppManagerLoader appManagerLoader;
+
+        static private IStringTemplateProvider StringTemplateProvider { get; }
+
         static async Task Main(string[] args)
         {
             try
             {
-                SetupEnvironment();
+                SetupEnvironment(args);
+
+                await LaunchApplications();
+
+                Console.WriteLine("\r\nPress <ESC> to EXIT.");
 
                 while (true)
                 {
-                    await RunIterations();
-
-                    Console.WriteLine("Press <ENTER> to repeat iteration(s) - <ESC> to EXIT.");
                     ConsoleKeyInfo keyInfo = Console.ReadKey();
 
                     if (keyInfo.Key == ConsoleKey.Escape)
                     {
                         break;
                     }
-
-                    Console.WriteLine();
                 }
+
+                Console.WriteLine();
             }
             catch (Exception ex)
             {
@@ -109,27 +119,59 @@ namespace DLQ.Message.Server
             SaveWindowPosition();
         }
 
-        private static async Task RunIterations()
+        private static async Task LaunchApplications()
         {
-            ServiceBus serviceBusConfig = configuration.Channels.Servers.First().ServiceBus;
-            Random random = new Random();
-
-            // Get Current Subscription List
-            if (await DLQMessageProcessor.HasTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
+            IDictionary<string, string> pairs = new Dictionary<string, string>
             {
-                List<SubscriptionDescription> subscriptionDescriptionList = DLQMessageProcessor.GetTopicSubscriptions();
+                [SolutionDirectoryToken] = GlobalArguments.SolutionDirectory,
+                [SolutionConfigurationToken] = GlobalArguments.SolutionConfiguration,
+                [CurrentDirToken] = Directory.GetCurrentDirectory()
+            };
 
-                foreach (SubscriptionDescription subscriptionDescription in subscriptionDescriptionList)
+            MarqueeStringTemplateProvider marqueeStringTemplateProvider = new MarqueeStringTemplateProvider();
+
+            Console.WriteLine("========================================================");
+            Console.WriteLine("Launching applications ...\r\n");
+
+            configuration.Launcher.Apps.OrderBy(p => p.Priority);
+
+            foreach (Apps app in configuration.Launcher.Apps)
+            {
+                if (app.LaunchDelaySec > 0)
                 {
-                    int numberMessagesToProcess = random.Next(configuration.Application.NumberofMessagestoSend + 1);
-                    Console.WriteLine($"Subscription '{subscriptionDescription.SubscriptionName}': processing {numberMessagesToProcess} messages --- expect unprocessed messages in DLQ within 60 seconds");
-                    await DLQMessageProcessor.ProcessMessagesInSubscription(serviceBusConfig, subscriptionDescription.SubscriptionName, numberMessagesToProcess);
+                    await Task.Delay(app.LaunchDelaySec * 1000);
                 }
-                Console.WriteLine();
+
+                string resolvedPath = appManagerLoader.StringTemplateProvider.PerformReduction(
+                    new ReadOnlyDictionary<string, string>(pairs),
+                    app.Path,
+                    new TemplateSettings()
+                    {
+                        EndTokenSymbol = "{",
+                        StartTokenSymbol = "}",
+                        Naive = true
+                    });
+
+                string workingDirectory = Path.GetDirectoryName(resolvedPath);
+                //string args = $"--{CommonConstants.EnvironmentNameConfigKey} {Controller.ConfigProvider.GetConfiguration().GetValue<string>(CommonConstants.EnvironmentNameConfigKey)} " +
+                //    $"--{CommonConstants.LicenseKeyConfigKey} {Controller.ConnectorConfiguration.LicenseKey} " +
+                //    $"--{CommonConstants.DisableDiagnosticsConfigKey} {Controller.ConfigProvider.GetConfiguration().GetValue<bool>(CommonConstants.DisableDiagnosticsConfigKey)} " +
+                //    $"{appConfiguration.Arguments}";
+                string args = string.Empty;
+
+                Process process = appManagerLoader.Launch(workingDirectory, resolvedPath, args);
+
+                if (process == null || process.Id <= 0)
+                {
+                    Console.WriteLine($"Unable to launch '{app.Name}' as a child process.");
+                    return;
+                }
+
+                Console.WriteLine($"APPLICATION ACTIVE: {app.Name}");
             }
         }
 
-        private static void SetupEnvironment()
+        private static void SetupEnvironment(string[] args)
         {
             // Get appsettings.json config - AddEnvironmentVariables()
             // requires packages:
@@ -155,6 +197,12 @@ namespace DLQ.Message.Server
             }
 
             SetWindowPosition();
+
+            // instance of application manager loader
+            appManagerLoader = new AppManagerLoader();
+
+            Directory.SetCurrentDirectory(System.AppDomain.CurrentDomain.BaseDirectory);
+            AppManagerArgumentHelper.SetApplicationArgumentsIfNecessary(args);
         }
 
         public static void SetWindowPosition()

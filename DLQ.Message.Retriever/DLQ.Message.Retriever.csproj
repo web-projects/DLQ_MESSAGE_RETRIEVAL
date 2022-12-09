@@ -29,7 +29,6 @@
     <PackageReference Include="TaskScheduler" Version="2.10.1" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\DLQ.Common.csproj" />
     <ProjectReference Include="..\DLQ.Message.Processor\DLQ.Message.Processor.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -1,5 +1,5 @@
 ﻿using DLQ.Common.Configuration.ChannelConfig;
-using DLQ.MessageProvider.Providers;
+using DLQ.Message.Processor.Providers;
 using System;
 using System.Diagnostics;
 using System.Threading;
