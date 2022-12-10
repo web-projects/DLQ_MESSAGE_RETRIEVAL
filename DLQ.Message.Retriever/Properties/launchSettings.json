@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DLQ.Message.Retriever": {
+      "commandName": "Project",
+      "commandLineArgs": "--logLocation $(SolutionDir)\\DLQ.Launcher\\bin\\Debug\\netcoreapp3.1\\logs\\DLQ.Launcher.log --logLevels 5"
+    }
+  }
+}

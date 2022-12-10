@@ -1,11 +1,13 @@
-﻿using DLQ.Common.Configuration;
+﻿using DLQ.Common.Arguments;
+using DLQ.Common.Configuration;
 using DLQ.Common.Configuration.ChannelConfig;
+using DLQ.Common.LoggerManager;
 using DLQ.MessageRetriever.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -81,7 +83,7 @@ namespace DLQ.Message.Retriever
         {
             try
             {
-                SetupEnvironment();
+                SetupEnvironment(args);
 
                 ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
@@ -104,7 +106,7 @@ namespace DLQ.Message.Retriever
             SaveWindowPosition();
         }
 
-        private static void SetupEnvironment()
+        private static void SetupEnvironment(string[] args)
         {
             // Get appsettings.json config - AddEnvironmentVariables()
             // requires packages:
@@ -130,6 +132,18 @@ namespace DLQ.Message.Retriever
             }
 
             SetWindowPosition();
+
+            if (args.Length > 0)
+            {
+                AppArgumentHelper.SetApplicationArgumentsIfNecessary(args);
+                SetLogging(GlobalArguments.LogDirectory, GlobalArguments.LogLevels);
+            }
+        }
+
+        static void SetLogging(string loggerFullPathLocation, int levels)
+        {
+            Logger.SetFileLoggerConfiguration(loggerFullPathLocation, levels);
+            Logger.info($"{Assembly.GetEntryAssembly().GetName().Name} ({Assembly.GetEntryAssembly().GetName().Version}) - LOGGING INITIALIZED.");
         }
 
         public static void SetWindowPosition()
@@ -185,7 +199,7 @@ namespace DLQ.Message.Retriever
                 jsonWriteOptions.Converters.Add(new JsonStringEnumConverter());
 
                 string newJson = JsonSerializer.Serialize(configuration, jsonWriteOptions);
-                Debug.WriteLine($"{newJson}");
+                //Debug.WriteLine($"{newJson}");
 
                 string appSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
                 File.WriteAllText(appSettingsPath, newJson);

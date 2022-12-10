@@ -1,5 +1,6 @@
 ﻿using DLQ.Common.Configuration;
 using DLQ.Common.Configuration.LauncherConfig;
+using DLQ.Common.LoggerManager;
 using DLQ.Launcher;
 using DLQ.Launcher.Core;
 using DLQ.Message.Launcher.Providers;
@@ -11,6 +12,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -81,6 +83,9 @@ namespace DLQ.Message.Launcher
         [DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
         #endregion --- WIN_API ---
+
+        static private string loggerFullPathLocation;
+        static private int loggerActiveLevels;
 
         static private AppConfig configuration;
 
@@ -157,7 +162,7 @@ namespace DLQ.Message.Launcher
                 //    $"--{CommonConstants.LicenseKeyConfigKey} {Controller.ConnectorConfiguration.LicenseKey} " +
                 //    $"--{CommonConstants.DisableDiagnosticsConfigKey} {Controller.ConfigProvider.GetConfiguration().GetValue<bool>(CommonConstants.DisableDiagnosticsConfigKey)} " +
                 //    $"{appConfiguration.Arguments}";
-                string args = string.Empty;
+                string args = $"--logLocation {loggerFullPathLocation} --logLevels {loggerActiveLevels}";
 
                 Process process = appManagerLoader.Launch(workingDirectory, resolvedPath, args);
 
@@ -203,6 +208,45 @@ namespace DLQ.Message.Launcher
 
             Directory.SetCurrentDirectory(System.AppDomain.CurrentDomain.BaseDirectory);
             AppManagerArgumentHelper.SetApplicationArgumentsIfNecessary(args);
+
+            Console.WriteLine($"\r\n==========================================================================================");
+            Console.WriteLine($"{Assembly.GetEntryAssembly().GetName().Name} - Version {Assembly.GetEntryAssembly().GetName().Version}");
+            Console.WriteLine($"==========================================================================================\r\n");
+
+            SetLogging();
+        }
+
+        static void SetLogging()
+        {
+            try
+            {
+                string[] logLevels = configuration.LoggingManager.Logging.Levels.Split("|");
+
+                if (logLevels.Length > 0)
+                {
+                    string fullName = Assembly.GetEntryAssembly().Location;
+                    string logname = Path.GetFileNameWithoutExtension(fullName) + ".log";
+                    string path = Directory.GetCurrentDirectory();
+                    loggerFullPathLocation = path + "\\logs\\" + logname;
+
+                    loggerActiveLevels = 0;
+                    foreach (string item in logLevels)
+                    {
+                        foreach (LOGLEVELS level in LogLevels.LogLevelsDictonary.Where(x => x.Value.Equals(item)).Select(x => x.Key))
+                        {
+                            loggerActiveLevels += (int)level;
+                        }
+                    }
+
+                    Logger.SetFileLoggerConfiguration(loggerFullPathLocation, loggerActiveLevels);
+
+                    Logger.info($"{Assembly.GetEntryAssembly().GetName().Name} ({Assembly.GetEntryAssembly().GetName().Version}) - LOGGING INITIALIZED.");
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.error("main: SetupLogging() - exception={0}", e.Message);
+            }
         }
 
         public static void SetWindowPosition()

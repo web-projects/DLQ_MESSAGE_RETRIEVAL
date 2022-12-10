@@ -1,5 +1,7 @@
-﻿using DLQ.Common.Configuration;
+﻿using DLQ.Common.Arguments;
+using DLQ.Common.Configuration;
 using DLQ.Common.Configuration.ChannelConfig;
+using DLQ.Common.LoggerManager;
 using DLQ.Message.Processor.Providers;
 using Microsoft.Azure.ServiceBus.Management;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -83,7 +86,7 @@ namespace DLQ.Message.Server
         {
             try
             {
-                SetupEnvironment();
+                SetupEnvironment(args);
 
                 while (true)
                 {
@@ -129,7 +132,7 @@ namespace DLQ.Message.Server
             }
         }
 
-        private static void SetupEnvironment()
+        private static void SetupEnvironment(string[] args)
         {
             // Get appsettings.json config - AddEnvironmentVariables()
             // requires packages:
@@ -155,6 +158,18 @@ namespace DLQ.Message.Server
             }
 
             SetWindowPosition();
+
+            if (args.Length > 0)
+            {
+                AppArgumentHelper.SetApplicationArgumentsIfNecessary(args);
+                SetLogging(GlobalArguments.LogDirectory, GlobalArguments.LogLevels);
+            }
+        }
+
+        static void SetLogging(string loggerFullPathLocation, int levels)
+        {
+            Logger.SetFileLoggerConfiguration(loggerFullPathLocation, levels);
+            Logger.info($"{Assembly.GetEntryAssembly().GetName().Name} ({Assembly.GetEntryAssembly().GetName().Version}) - LOGGING INITIALIZED.");
         }
 
         public static void SetWindowPosition()

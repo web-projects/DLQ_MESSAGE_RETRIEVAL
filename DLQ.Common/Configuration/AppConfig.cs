@@ -2,6 +2,7 @@
 using DLQ.Common.Configuration.BackgroundConfig;
 using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.Configuration.LauncherConfig;
+using DLQ.Common.Configuration.LoggerManagerConfig;
 using System;
 
 namespace DLQ.Common.Configuration
@@ -14,5 +15,6 @@ namespace DLQ.Common.Configuration
         public string AllowedHosts { get; set; }
         public Channels Channels { get; set; }
         public Launcher Launcher { get; set; }
+        public LoggingManager LoggingManager { get; set; }
     }
 }

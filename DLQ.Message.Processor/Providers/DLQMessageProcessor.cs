@@ -1,5 +1,6 @@
 ﻿using Azure.Messaging.ServiceBus;
 using DLQ.Common.Configuration.ChannelConfig;
+using DLQ.Common.LoggerManager;
 using DLQ.Common.Utilities;
 using DLQ.Message.Processor.Messages;
 using DLQ.Message.Provider.Providers;
@@ -119,7 +120,9 @@ namespace DLQ.Message.Processor.Providers
                         }
                     }
 
-                    await sbReceiver.DisposeAsync();
+                    // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
+                    await sbReceiver.DisposeAsync().ConfigureAwait(false);
+                    await sbClient.DisposeAsync().ConfigureAwait(false);
 
                     // Delete last entry in the worker
                     subscriptionDescriptionsWorker.Remove(subcriptionDescription);
@@ -155,6 +158,7 @@ namespace DLQ.Message.Processor.Providers
             ServiceBusSender sbSender = sbClient.CreateSender(serviceBusConfiguration.Topic);
 
             Console.WriteLine($"Sending messages to Topic '{serviceBusConfiguration.Topic}' for Subscription '{subscriptionKey}' ...");
+            Logger.debug("Sending messages to Topic '{0}' for Subscription '{1}' ...", serviceBusConfiguration.Topic, subscriptionKey);
 
             // send several messages to the queue
             for (int index = 0; index < NumberofMessagestoSend; index++)
@@ -183,7 +187,9 @@ namespace DLQ.Message.Processor.Providers
                         TimeToLive = TimeSpan.FromSeconds(serviceBusConfiguration.SubscriptionMessageTTLSec)
                     };
 
-                    await sbSender.SendMessageAsync(serviceBusMessage);
+                    Logger.debug("DLQMessageProcessor: Message Id {0}, Subject {1}", serviceBusMessage.MessageId, serviceBusMessage.Subject);
+
+                    await sbSender.SendMessageAsync(serviceBusMessage).ConfigureAwait(false);
 
                     lock (Console.Out)
                     {
@@ -198,7 +204,9 @@ namespace DLQ.Message.Processor.Providers
                 await Task.Delay(100);
             }
 
-            await sbSender.DisposeAsync();
+            // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
+            await sbSender.DisposeAsync().ConfigureAwait(false);
+            await sbClient.DisposeAsync().ConfigureAwait(false);
         }
 
         public static async Task ProcessMessagesInSubscription(ServiceBus serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess)
@@ -253,7 +261,9 @@ namespace DLQ.Message.Processor.Providers
                         }
                     }
 
-                    await sbReceiver.DisposeAsync();
+                    // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
+                    await sbReceiver.DisposeAsync().ConfigureAwait(false);
+                    await sbClient.DisposeAsync().ConfigureAwait(false);
                 }
             }
             catch (ServiceBusException e)
