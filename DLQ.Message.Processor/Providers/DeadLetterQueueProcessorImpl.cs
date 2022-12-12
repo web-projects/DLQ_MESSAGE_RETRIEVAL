@@ -59,7 +59,7 @@ namespace DLQ.Message.Processor.Providers
                 subscriptionDescriptionsWorker = subscriptionDescriptions;
 
                 Console.WriteLine($"Topic [{serviceBusConfiguration.Topic}] has {subscriptionDescriptions.Count()} active subscriptions.\r\n");
-                Logger.info($"Topic [{0}] has {1} active subscriptions.", serviceBusConfiguration.Topic, subscriptionDescriptions.Count());
+                Logger.info("Topic [{0}] has {1} active subscriptions.", serviceBusConfiguration.Topic, subscriptionDescriptions.Count());
             }
 
             return subscriptionDescriptions.Count() > 0;
@@ -106,6 +106,7 @@ namespace DLQ.Message.Processor.Providers
                                 lock (Console.Out)
                                 {
                                     Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{brokerMessage.StringData}]");
+                                    Logger.info("DLQ: MessageId={0} - [{1}]", brokerDLQMessage.MessageId, brokerMessage.StringData);
                                 }
 
                                 // Peform resources and task cleanup
@@ -159,7 +160,7 @@ namespace DLQ.Message.Processor.Providers
             ServiceBusSender sbSender = sbClient.CreateSender(serviceBusConfiguration.Topic);
 
             Console.WriteLine($"Sending messages to Topic '{serviceBusConfiguration.Topic}' for Subscription '{subscriptionKey}' ...");
-            Logger.debug("Sending messages to Topic '{0}' for Subscription '{1}' ...", serviceBusConfiguration.Topic, subscriptionKey);
+            Logger.info("Sending messages to Topic '{0}' for Subscription '{1}' ...", serviceBusConfiguration.Topic, subscriptionKey);
 
             // send several messages to the queue
             for (int index = 0; index < NumberofMessagestoSend; index++)
@@ -188,13 +189,12 @@ namespace DLQ.Message.Processor.Providers
                         TimeToLive = TimeSpan.FromSeconds(serviceBusConfiguration.SubscriptionMessageTTLSec)
                     };
 
-                    Logger.debug("DLQMessageProcessor: Message Id {0}, Subject {1}", serviceBusMessage.MessageId, serviceBusMessage.Subject);
-
                     await sbSender.SendMessageAsync(serviceBusMessage).ConfigureAwait(false);
 
                     lock (Console.Out)
                     {
                         Console.WriteLine($"SENT {string.Format("{0:D3}", index)}: MessageId={serviceBusMessage.MessageId} - [{brokerMessage.StringData}]");
+                        Logger.info("SENT {0}: MessageId={1} - [{2}]", string.Format("{0:D3}", index), serviceBusMessage.MessageId, brokerMessage.StringData);
                     }
                 }
                 catch (Exception ex)
@@ -236,7 +236,7 @@ namespace DLQ.Message.Processor.Providers
                         });
 
                     Console.WriteLine($"Processing DLQ messages for Subscription: '{subscriptionName}' ...");
-                    Logger.info($"Processing DLQ messages for Subscription: '{0}' ...", subscriptionName);
+                    Logger.info("Processing DLQ messages for Subscription: '{0}' ...", subscriptionName);
 
                     while (true)
                     {
@@ -251,7 +251,7 @@ namespace DLQ.Message.Processor.Providers
                                 lock (Console.Out)
                                 {
                                     Console.WriteLine($"{string.Format("{0:D3}", ++counter)} Message: MessageId={brokerActiveMessage.MessageId} - [{brokerMessage.StringData}]");
-                                    Logger.info($"{string.Format("{0:D3}", ++counter)} Message: MessageId={0} - [{1}]", brokerActiveMessage.MessageId, brokerMessage.StringData);
+                                    Logger.info("{0} Message: MessageId={1} - [{2}]", string.Format("{0:D3}", ++counter), brokerActiveMessage.MessageId, brokerMessage.StringData);
                                 }
 
                                 // Remove message from Active List

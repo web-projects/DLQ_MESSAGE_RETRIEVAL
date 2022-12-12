@@ -135,7 +135,7 @@ namespace DLQ.Message.Server
                 {
                     int numberMessagesToProcess = random.Next(configuration.Application.NumberofMessagestoSend + 1);
                     Console.WriteLine($"Subscription '{subscriptionDescription.SubscriptionName}': processing {numberMessagesToProcess} messages --- expect unprocessed messages in DLQ within 60 seconds");
-                    Logger.info($"Subscription '{0}': processing {1} messages --- expect unprocessed messages in DLQ within 60 seconds", subscriptionDescription.SubscriptionName, numberMessagesToProcess);
+                    Logger.info("Subscription '{0}': processing {1} messages --- expect unprocessed messages in DLQ within 60 seconds", subscriptionDescription.SubscriptionName, numberMessagesToProcess);
                     await serverProcessorLoader.DeadLetterQueueProcessorImpl.ProcessMessagesInSubscription(serviceBusConfig, subscriptionDescription.SubscriptionName, numberMessagesToProcess);
                 }
                 Console.WriteLine();
