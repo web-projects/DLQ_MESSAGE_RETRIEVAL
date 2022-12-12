@@ -11,6 +11,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace DLQ.Message.Retriever
 {
@@ -79,10 +80,11 @@ namespace DLQ.Message.Retriever
 
         static private AppConfig configuration;
 
+        static private string pseudoBrokerId;
         static private RetrieverProcessorLoader retrieverProcessorLoader;
-        static private MessageRetrieverProvider messageRetrieverProvider;
+        static private AzureServiceBusTopicServer serviceBusTopicServer;
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             try
             {
@@ -93,7 +95,8 @@ namespace DLQ.Message.Retriever
                 ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
                 // Setup background
-                messageRetrieverProvider.StartBackgroundTask(serviceBus, configuration.BackgroundTask.RefreshTimerSec);
+                pseudoBrokerId = Guid.NewGuid().ToString();
+                string filterName = await serviceBusTopicServer.ConnectAsync(serviceBus, configuration.BackgroundTask.RefreshTimerSec, pseudoBrokerId);
             }
             catch (Exception ex)
             {
@@ -102,11 +105,9 @@ namespace DLQ.Message.Retriever
             }
 
             Console.WriteLine($"DLQ Message Processor Background Service Started with a {configuration.BackgroundTask.RefreshTimerSec} Sec Interval.");
+            Console.WriteLine($"Pseudo Broker Id: {{{pseudoBrokerId}}}");
             Console.WriteLine("Press <ESC> to EXIT.\r\n");
             Console.ReadLine();
-
-            // clean up task
-            messageRetrieverProvider.StopBackgroundTask();
 
             SaveWindowPosition();
         }
@@ -115,7 +116,7 @@ namespace DLQ.Message.Retriever
         {
             // instance of application manager loader
             retrieverProcessorLoader = new RetrieverProcessorLoader();
-            messageRetrieverProvider = new MessageRetrieverProvider(retrieverProcessorLoader.DeadLetterQueueProcessorImpl);
+            serviceBusTopicServer = new AzureServiceBusTopicServer(retrieverProcessorLoader.DeadLetterQueueProcessorImpl);
         }
 
         private static void SetupEnvironment(string[] args)

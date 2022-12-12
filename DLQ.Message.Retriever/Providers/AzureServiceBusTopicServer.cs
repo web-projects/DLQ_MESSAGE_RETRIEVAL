@@ -1,7 +1,6 @@
 ﻿using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.LoggerManager;
 using DLQ.Message.Processor.Providers;
-using DLQ.Message.Retriever;
 using System;
 using System.Diagnostics;
 using System.Threading;
@@ -11,7 +10,7 @@ using Timer = System.Threading.Timer;
 namespace DLQ.MessageRetriever.Providers
 {
     // https://learn.microsoft.com/en-us/windows/uwp/launch-resume/run-a-background-task-on-a-timer-
-    public class MessageRetrieverProvider
+    public class AzureServiceBusTopicServer : IAzureServiceBusTopicServer, IDisposable
     {
         private int iterationCount = 0;
 
@@ -19,19 +18,41 @@ namespace DLQ.MessageRetriever.Providers
         private int timeoutDelayMs;
         private ServiceBus serviceBusConfig;
 
+        private string filterRuleName;
+
         private IDeadLetterQueueProcessor deadLetterQueueProcessorImpl;
 
-        public MessageRetrieverProvider(IDeadLetterQueueProcessor deadLetterQueueProcessorImpl)
+        public AzureServiceBusTopicServer(IDeadLetterQueueProcessor deadLetterQueueProcessorImpl)
             => this.deadLetterQueueProcessorImpl = deadLetterQueueProcessorImpl;
 
-        public void StartBackgroundTask(ServiceBus serviceBus, int timeoutDelaySec)
+        public void Dispose()
+        {
+            StopBackgroundTask();
+        }
+
+        public async Task<string> ConnectAsync(ServiceBus serviceBus, int timeoutDelaySec, string filter)
+        {
+            // set filtering rule
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                filterRuleName = $"FilterOn_{filter}";
+            }
+
+            await Task.Delay(1);
+
+            StartBackgroundTask(serviceBus, timeoutDelaySec);
+
+            return filterRuleName;
+        }
+
+        private void StartBackgroundTask(ServiceBus serviceBus, int timeoutDelaySec)
         {
             serviceBusConfig = serviceBus;
             timeoutDelayMs = timeoutDelaySec * 1000;
             RegisterBackgroundTask(timeoutDelayMs);
         }
 
-        public void StopBackgroundTask()
+        private void StopBackgroundTask()
         {
             StopTimer();
         }
@@ -44,6 +65,16 @@ namespace DLQ.MessageRetriever.Providers
                 dueTime: timeoutDelay,
                 period: timeoutDelay
             );
+        }
+
+        private void StopTimer()
+        {
+            if (refreshTimer != null)
+            {
+                refreshTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                refreshTimer.Dispose();
+                refreshTimer = null;
+            }
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Required by delegate.")]
@@ -84,16 +115,6 @@ namespace DLQ.MessageRetriever.Providers
 
             // Schedule a new timer
             RegisterBackgroundTask(timeoutDelayMs);
-        }
-
-        private void StopTimer()
-        {
-            if (refreshTimer != null)
-            {
-                refreshTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                refreshTimer.Dispose();
-                refreshTimer = null;
-            }
         }
     }
 }
