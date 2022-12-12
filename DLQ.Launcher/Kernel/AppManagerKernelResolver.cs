@@ -1,4 +1,5 @@
-﻿using Ninject.Modules;
+﻿using DLQ.Launcher.Modules;
+using Ninject.Modules;
 
 namespace DLQ.Launcher.Kernel
 {

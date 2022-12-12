@@ -46,3 +46,4 @@ The sample code is further documented inline in the [Program.cs](Program.cs) C# 
 ### HISTORY ###
 
 * 20221202 - Initial repository.
+* 20221212 - Added Dependency Injection to Communication Modules.

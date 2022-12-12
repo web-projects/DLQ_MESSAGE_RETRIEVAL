@@ -79,16 +79,21 @@ namespace DLQ.Message.Retriever
 
         static private AppConfig configuration;
 
+        static private RetrieverProcessorLoader retrieverProcessorLoader;
+        static private MessageRetrieverProvider messageRetrieverProvider;
+
         static void Main(string[] args)
         {
             try
             {
                 SetupEnvironment(args);
 
+                InitializeProviders();
+
                 ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
                 // Setup background
-                MessageRetrieverProvider.StartBackgroundTask(serviceBus, configuration.BackgroundTask.RefreshTimerSec);
+                messageRetrieverProvider.StartBackgroundTask(serviceBus, configuration.BackgroundTask.RefreshTimerSec);
             }
             catch (Exception ex)
             {
@@ -101,9 +106,16 @@ namespace DLQ.Message.Retriever
             Console.ReadLine();
 
             // clean up task
-            MessageRetrieverProvider.StopBackgroundTask();
+            messageRetrieverProvider.StopBackgroundTask();
 
             SaveWindowPosition();
+        }
+
+        private static void InitializeProviders()
+        {
+            // instance of application manager loader
+            retrieverProcessorLoader = new RetrieverProcessorLoader();
+            messageRetrieverProvider = new MessageRetrieverProvider(retrieverProcessorLoader.DeadLetterQueueProcessorImpl);
         }
 
         private static void SetupEnvironment(string[] args)

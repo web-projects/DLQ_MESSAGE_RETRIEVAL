@@ -2,7 +2,6 @@
 using DLQ.Common.Configuration;
 using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.LoggerManager;
-using DLQ.Message.Processor.Providers;
 using Microsoft.Azure.ServiceBus.Management;
 using Microsoft.Extensions.Configuration;
 using System;
@@ -82,11 +81,15 @@ namespace DLQ.Message.Server
 
         static private AppConfig configuration;
 
+        static private ServerProcessorLoader serverProcessorLoader;
+
         static async Task Main(string[] args)
         {
             try
             {
                 SetupEnvironment(args);
+
+                InitializeProviders();
 
                 while (true)
                 {
@@ -112,21 +115,28 @@ namespace DLQ.Message.Server
             SaveWindowPosition();
         }
 
+        private static void InitializeProviders()
+        {
+            // instance of application manager loader
+            serverProcessorLoader = new ServerProcessorLoader();
+        }
+
         private static async Task RunIterations()
         {
             ServiceBus serviceBusConfig = configuration.Channels.Servers.First().ServiceBus;
             Random random = new Random();
 
             // Get Current Subscription List
-            if (await DLQMessageProcessor.HasTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
+            if (await serverProcessorLoader.DeadLetterQueueProcessorImpl.HasTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
             {
-                List<SubscriptionDescription> subscriptionDescriptionList = DLQMessageProcessor.GetTopicSubscriptions();
+                List<SubscriptionDescription> subscriptionDescriptionList = serverProcessorLoader.DeadLetterQueueProcessorImpl.GetTopicSubscriptions();
 
                 foreach (SubscriptionDescription subscriptionDescription in subscriptionDescriptionList)
                 {
                     int numberMessagesToProcess = random.Next(configuration.Application.NumberofMessagestoSend + 1);
                     Console.WriteLine($"Subscription '{subscriptionDescription.SubscriptionName}': processing {numberMessagesToProcess} messages --- expect unprocessed messages in DLQ within 60 seconds");
-                    await DLQMessageProcessor.ProcessMessagesInSubscription(serviceBusConfig, subscriptionDescription.SubscriptionName, numberMessagesToProcess);
+                    Logger.info($"Subscription '{0}': processing {1} messages --- expect unprocessed messages in DLQ within 60 seconds", subscriptionDescription.SubscriptionName, numberMessagesToProcess);
+                    await serverProcessorLoader.DeadLetterQueueProcessorImpl.ProcessMessagesInSubscription(serviceBusConfig, subscriptionDescription.SubscriptionName, numberMessagesToProcess);
                 }
                 Console.WriteLine();
             }

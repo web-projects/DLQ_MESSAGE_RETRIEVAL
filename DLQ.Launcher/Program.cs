@@ -99,6 +99,8 @@ namespace DLQ.Message.Launcher
             {
                 SetupEnvironment(args);
 
+                InitializeProviders();
+
                 await LaunchApplications();
 
                 Console.WriteLine("\r\nPress <ESC> to EXIT.");
@@ -124,6 +126,12 @@ namespace DLQ.Message.Launcher
             SaveWindowPosition();
         }
 
+        private static void InitializeProviders()
+        {
+            // instance of application manager loader
+            appManagerLoader = new AppManagerLoader();
+        }
+
         private static async Task LaunchApplications()
         {
             IDictionary<string, string> pairs = new Dictionary<string, string>
@@ -138,7 +146,7 @@ namespace DLQ.Message.Launcher
             Console.WriteLine("========================================================");
             Console.WriteLine("Launching applications ...\r\n");
 
-            configuration.Launcher.Apps.OrderBy(p => p.Priority);
+            configuration.Launcher.Apps.OrderBy(p => p.PriorityLevel);
 
             foreach (Apps app in configuration.Launcher.Apps)
             {
@@ -202,9 +210,6 @@ namespace DLQ.Message.Launcher
             }
 
             SetWindowPosition();
-
-            // instance of application manager loader
-            appManagerLoader = new AppManagerLoader();
 
             Directory.SetCurrentDirectory(System.AppDomain.CurrentDomain.BaseDirectory);
             AppManagerArgumentHelper.SetApplicationArgumentsIfNecessary(args);

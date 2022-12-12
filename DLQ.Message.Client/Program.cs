@@ -2,7 +2,6 @@
 using DLQ.Common.Configuration;
 using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.LoggerManager;
-using DLQ.Message.Processor.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.IO;
@@ -80,11 +79,15 @@ namespace DLQ.Message.Client
 
         static private AppConfig configuration;
 
+        static private ClientProcessorLoader clientProcessorLoader;
+
         static async Task Main(string[] args)
         {
             try
             {
                 SetupEnvironment(args);
+
+                InitializeProviders();
 
                 while (true)
                 {
@@ -112,6 +115,12 @@ namespace DLQ.Message.Client
             SaveWindowPosition();
         }
 
+        private static void InitializeProviders()
+        {
+            // instance of application manager loader
+            clientProcessorLoader = new ClientProcessorLoader();
+        }
+
         private static async Task RunIterations()
         {
             ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
@@ -126,10 +135,10 @@ namespace DLQ.Message.Client
                     index + 1, configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed));
 
                 // FilterRule name
-                string filterRuleName = await DLQMessageProcessor.CreateFilterRule(serviceBus, true);
+                string filterRuleName = await clientProcessorLoader.DeadLetterQueueProcessorImpl.CreateFilterRule(serviceBus, true);
 
                 // Write messages to DLQ
-                await DLQMessageProcessor.WriteDLQMessages(serviceBus, configuration.Application.NumberofMessagestoSend).ConfigureAwait(false);
+                await clientProcessorLoader.DeadLetterQueueProcessorImpl.WriteDLQMessages(serviceBus, configuration.Application.NumberofMessagestoSend).ConfigureAwait(false);
             }
         }
 

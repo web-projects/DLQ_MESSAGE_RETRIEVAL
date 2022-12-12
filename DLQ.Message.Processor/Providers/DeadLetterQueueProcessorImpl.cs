@@ -13,21 +13,21 @@ using System.Threading.Tasks;
 
 namespace DLQ.Message.Processor.Providers
 {
-    public static class DLQMessageProcessor
+    public class DeadLetterQueueProcessorImpl : IDeadLetterQueueProcessor
     {
-        private static string filterRuleName;
-        private static string subscriptionKey;
+        private string filterRuleName;
+        private string subscriptionKey;
 
-        private static List<SubscriptionDescription> subscriptionDescriptions = new List<SubscriptionDescription>();
-        private static List<SubscriptionDescription> subscriptionDescriptionsWorker = new List<SubscriptionDescription>();
+        private List<SubscriptionDescription> subscriptionDescriptions = new List<SubscriptionDescription>();
+        private List<SubscriptionDescription> subscriptionDescriptionsWorker = new List<SubscriptionDescription>();
 
-        private static BrokerMessage GetBrokerMessageFromBinaryData(BinaryData messageBinaryData)
+        private BrokerMessage GetBrokerMessageFromBinaryData(BinaryData messageBinaryData)
             => (BrokerMessage)ArrayUtils.FromByteArray(messageBinaryData.ToArray());
 
-        public static List<SubscriptionDescription> GetTopicSubscriptions()
+        public List<SubscriptionDescription> GetTopicSubscriptions()
             => subscriptionDescriptions;
 
-        public static async Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool resetSubscriptionKey)
+        public async Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool resetSubscriptionKey)
         {
             if (resetSubscriptionKey)
             {
@@ -38,7 +38,7 @@ namespace DLQ.Message.Processor.Providers
             return filterRuleName;
         }
 
-        public static async Task<bool> HasTopicSubscriptions(ServiceBus serviceBusConfiguration)
+        public async Task<bool> HasTopicSubscriptions(ServiceBus serviceBusConfiguration)
         {
             if (subscriptionDescriptionsWorker.Count() == 0)
             {
@@ -59,12 +59,13 @@ namespace DLQ.Message.Processor.Providers
                 subscriptionDescriptionsWorker = subscriptionDescriptions;
 
                 Console.WriteLine($"Topic [{serviceBusConfiguration.Topic}] has {subscriptionDescriptions.Count()} active subscriptions.\r\n");
+                Logger.info($"Topic [{0}] has {1} active subscriptions.", serviceBusConfiguration.Topic, subscriptionDescriptions.Count());
             }
 
             return subscriptionDescriptions.Count() > 0;
         }
 
-        public static async Task<bool> ReadDLQMessages(ServiceBus serviceBusConfiguration)
+        public async Task<bool> ReadDLQMessages(ServiceBus serviceBusConfiguration)
         {
             if (subscriptionDescriptionsWorker.Count() == 0)
             {
@@ -150,7 +151,7 @@ namespace DLQ.Message.Processor.Providers
         /// <param name="serviceBusConfiguration"></param>
         /// <param name="log"></param>
         /// <returns></returns>
-        public static async Task WriteDLQMessages(ServiceBus serviceBusConfiguration, int NumberofMessagestoSend)
+        public async Task WriteDLQMessages(ServiceBus serviceBusConfiguration, int NumberofMessagestoSend)
         {
             ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
 
@@ -209,7 +210,12 @@ namespace DLQ.Message.Processor.Providers
             await sbClient.DisposeAsync().ConfigureAwait(false);
         }
 
-        public static async Task ProcessMessagesInSubscription(ServiceBus serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess)
+        public async Task<IList<ServiceBusReceivedMessage>> ReadDeadLetterQueue(string subscriptionId, int messageCount)
+        {
+            return null;
+        }
+
+        public async Task ProcessMessagesInSubscription(ServiceBus serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess)
         {
             int counter = 0;
 
@@ -230,6 +236,7 @@ namespace DLQ.Message.Processor.Providers
                         });
 
                     Console.WriteLine($"Processing DLQ messages for Subscription: '{subscriptionName}' ...");
+                    Logger.info($"Processing DLQ messages for Subscription: '{0}' ...", subscriptionName);
 
                     while (true)
                     {
@@ -244,6 +251,7 @@ namespace DLQ.Message.Processor.Providers
                                 lock (Console.Out)
                                 {
                                     Console.WriteLine($"{string.Format("{0:D3}", ++counter)} Message: MessageId={brokerActiveMessage.MessageId} - [{brokerMessage.StringData}]");
+                                    Logger.info($"{string.Format("{0:D3}", ++counter)} Message: MessageId={0} - [{1}]", brokerActiveMessage.MessageId, brokerMessage.StringData);
                                 }
 
                                 // Remove message from Active List

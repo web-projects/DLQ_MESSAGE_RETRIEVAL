@@ -10,6 +10,7 @@ namespace DLQ.Common.Configuration
     [Serializable]
     public class AppConfig
     {
+        public string EnvironmentName { get; set; }
         public Application Application { get; set; }
         public BackgroundTask BackgroundTask { get; set; }
         public string AllowedHosts { get; set; }
