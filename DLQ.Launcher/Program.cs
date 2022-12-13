@@ -184,6 +184,7 @@ namespace DLQ.Message.Launcher
             }
         }
 
+        #region --- Application Setup ---
         private static void SetupEnvironment(string[] args)
         {
             // Get appsettings.json config - AddEnvironmentVariables()
@@ -223,7 +224,7 @@ namespace DLQ.Message.Launcher
             SetLogging();
         }
 
-        static void SetLogging()
+        private static void SetLogging()
         {
             try
             {
@@ -256,7 +257,7 @@ namespace DLQ.Message.Launcher
             }
         }
 
-        public static void SetWindowPosition()
+        private static void SetWindowPosition()
         {
             // x : left side of window
             // y : top position of window
@@ -288,7 +289,7 @@ namespace DLQ.Message.Launcher
             AppSettingsUpdate();
         }
 
-        public static IntPtr Handle
+        private static IntPtr Handle
         {
             get
             {
@@ -319,5 +320,6 @@ namespace DLQ.Message.Launcher
                 Console.WriteLine($"Exception in saving settings: {ex}");
             }
         }
+        #endregion --- Application Setup ---
     }
 }

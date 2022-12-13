@@ -142,6 +142,7 @@ namespace DLQ.Message.Server
             }
         }
 
+        #region --- Application Setup ---
         private static void SetupEnvironment(string[] args)
         {
             // Get appsettings.json config - AddEnvironmentVariables()
@@ -176,13 +177,13 @@ namespace DLQ.Message.Server
             }
         }
 
-        static void SetLogging(string loggerFullPathLocation, int levels)
+        private static void SetLogging(string loggerFullPathLocation, int levels)
         {
             Logger.SetFileLoggerConfiguration(loggerFullPathLocation, levels);
             Logger.info($"{Assembly.GetEntryAssembly().GetName().Name} ({Assembly.GetEntryAssembly().GetName().Version}) - LOGGING INITIALIZED.");
         }
 
-        public static void SetWindowPosition()
+        private static void SetWindowPosition()
         {
             // x : left side of window
             // y : top position of window
@@ -214,7 +215,7 @@ namespace DLQ.Message.Server
             AppSettingsUpdate();
         }
 
-        public static IntPtr Handle
+        private static IntPtr Handle
         {
             get
             {
@@ -245,5 +246,6 @@ namespace DLQ.Message.Server
                 Console.WriteLine($"Exception in saving settings: {ex}");
             }
         }
+        #endregion --- Application Setup ---
     }
 }

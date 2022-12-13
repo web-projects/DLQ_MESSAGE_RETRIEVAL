@@ -4,7 +4,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 
 namespace DLQ.Common.Utilities
 {
-    public class ArrayUtils
+    public static class ArrayUtils
     {
         public static byte[] ToByteArray(Object obj)
         {

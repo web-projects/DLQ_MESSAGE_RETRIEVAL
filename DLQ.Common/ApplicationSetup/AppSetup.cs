@@ -1,21 +1,17 @@
 ﻿using DLQ.Common.Arguments;
 using DLQ.Common.Configuration;
-using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.LoggerManager;
-using DLQ.MessageRetriever.Providers;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
-namespace DLQ.Message.Retriever
+namespace DLQ.Common.ApplicationSetup
 {
-    static class Program
+    public class AppSetup
     {
         #region --- WIN_API ---
         const int SWP_NOZORDER = 0x4;
@@ -68,7 +64,7 @@ namespace DLQ.Message.Retriever
         static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
             int x, int y, int cx, int cy, int flags);
 
-        [DllImport("user32")]
+        [System.Runtime.InteropServices.DllImport("user32")]
         static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -78,49 +74,10 @@ namespace DLQ.Message.Retriever
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
         #endregion --- WIN_API ---
 
-        static private AppConfig configuration;
-
-        static private string pseudoBrokerId;
-        static private RetrieverProcessorLoader retrieverProcessorLoader;
-        static private AzureServiceBusTopicServer serviceBusTopicServer;
-
-        static async Task Main(string[] args)
-        {
-            try
-            {
-                SetupEnvironment(args);
-
-                InitializeProviders();
-
-                ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
-
-                // Setup background
-                pseudoBrokerId = Guid.NewGuid().ToString();
-                string filterName = await serviceBusTopicServer.ConnectAsync(serviceBus, configuration.BackgroundTask.RefreshTimerSec, pseudoBrokerId);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                throw;
-            }
-
-            Console.WriteLine($"DLQ Message Processor Background Service Started with a {configuration.BackgroundTask.RefreshTimerSec} Sec Interval.");
-            Console.WriteLine($"Pseudo Broker Id: {{{pseudoBrokerId}}}");
-            Console.WriteLine("Press <ESC> to EXIT.\r\n");
-            Console.ReadLine();
-
-            SaveWindowPosition();
-        }
-
-        private static void InitializeProviders()
-        {
-            // instance of application manager loader
-            retrieverProcessorLoader = new RetrieverProcessorLoader();
-            serviceBusTopicServer = new AzureServiceBusTopicServer(retrieverProcessorLoader.DeadLetterQueueProcessorImpl);
-        }
+        private AppConfig configuration;
 
         #region --- Application Setup ---
-        private static void SetupEnvironment(string[] args)
+        public AppConfig SetupEnvironment()
         {
             // Get appsettings.json config - AddEnvironmentVariables()
             // requires packages:
@@ -147,20 +104,22 @@ namespace DLQ.Message.Retriever
 
             SetWindowPosition();
 
-            if (args.Length > 0)
-            {
-                AppArgumentHelper.SetApplicationArgumentsIfNecessary(args);
-                SetLogging(GlobalArguments.LogDirectory, GlobalArguments.LogLevels);
-            }
+            //if (args.Length > 0)
+            //{
+            //    AppArgumentHelper.SetApplicationArgumentsIfNecessary(args);
+            //    SetLogging(GlobalArguments.LogDirectory, GlobalArguments.LogLevels);
+            //}
+
+            return configuration;
         }
 
-        private static void SetLogging(string loggerFullPathLocation, int levels)
+        public void SetLogging(string loggerFullPathLocation, int levels)
         {
             Logger.SetFileLoggerConfiguration(loggerFullPathLocation, levels);
             Logger.info($"{Assembly.GetEntryAssembly().GetName().Name} ({Assembly.GetEntryAssembly().GetName().Version}) - LOGGING INITIALIZED.");
         }
 
-        private static void SetWindowPosition()
+        private void SetWindowPosition()
         {
             // x : left side of window
             // y : top position of window
@@ -174,7 +133,7 @@ namespace DLQ.Message.Retriever
                 SWP_NOZORDER | SWP_NOACTIVATE);
         }
 
-        private static void SaveWindowPosition()
+        public void SaveWindowPosition()
         {
             // Get this console window's hWnd (window handle).
             IntPtr hWnd = GetConsoleWindow();
@@ -196,12 +155,11 @@ namespace DLQ.Message.Retriever
         {
             get
             {
-                //Initialize();
                 return GetConsoleWindow();
             }
         }
 
-        private static void AppSettingsUpdate()
+        private void AppSettingsUpdate()
         {
             try
             {

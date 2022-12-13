@@ -269,20 +269,22 @@ namespace DLQ.Message.Processor.Providers
                                 lock (Console.Out)
                                 {
                                     Console.WriteLine($"{string.Format("{0:D3}", ++counter)} Message: MessageId={brokerActiveMessage.MessageId} - [{brokerMessage.StringData}]");
-                                    Logger.info("{0} Message: MessageId={1} - [{2}]", string.Format("{0:D3}", ++counter), brokerActiveMessage.MessageId, brokerMessage.StringData);
+                                    Logger.info("{0} Message: MessageId={1} - [{2}]", string.Format("{0:D3}", counter), brokerActiveMessage.MessageId, brokerMessage.StringData);
                                 }
 
                                 // Remove message from Active List
                                 await sbReceiver.CompleteMessageAsync(brokerActiveMessage).ConfigureAwait(false);
                             }
 
-                            if (counter == numberMessagesToProcess)
+                            if (counter >= numberMessagesToProcess)
                             {
                                 break;
                             }
                         }
                         else
                         {
+                            Console.WriteLine($"No active message. Total messages processed = {counter}");
+                            Logger.info("No active message. Total messages processed = {0}", counter);
                             break;
                         }
                     }
