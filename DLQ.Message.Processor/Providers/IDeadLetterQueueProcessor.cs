@@ -8,7 +8,7 @@ namespace DLQ.Message.Processor.Providers
 {
     public interface IDeadLetterQueueProcessor
     {
-        Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool resetSubscriptionKey);
+        Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool setDefaultRuleName, bool resetSubscriptionKey);
         Task<bool> HasTopicSubscriptions(ServiceBus serviceBusConfiguration);
         List<SubscriptionDescription> GetTopicSubscriptions();
         Task<bool> ReadDLQMessages(ServiceBus serviceBusConfiguration);

@@ -194,7 +194,9 @@ namespace DLQ.Message.Launcher
             //                    Microsoft.Extensions.Configuration.EnvironmentVariables
             //                    Microsoft.Extensions.Configuration.Json
             configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", optional: true)
                 .AddEnvironmentVariables()
                 .Build()
                 .Get<AppConfig>();

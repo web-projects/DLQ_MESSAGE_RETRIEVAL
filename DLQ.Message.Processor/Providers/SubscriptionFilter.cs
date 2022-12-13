@@ -6,26 +6,29 @@ using System.Threading.Tasks;
 
 namespace DLQ.Message.Provider.Providers
 {
-    public static class SubscriptionFilter
+    internal sealed class SubscriptionFilter
     {
         private const int iterationCount = 2;
-        private static Guid filterName;
-        private static string filterRuleName;
-        private static ServiceBus serviceBusConfiguration;
+        private Guid filterName;
+        private string filterRuleName;
+        private ServiceBus serviceBusConfiguration;
 
         // default rule for SQLFilter which allows broker to receive all broadcasted messages
-        private static string lastRuleName = "$Default";
+        private string lastRuleName = "$Default";
 
-        private static string instanceSubscriptionKey;
-        private static string SubscriptionKey;
+        private string instanceSubscriptionKey;
+        private string SubscriptionKey;
 
-        public static string GetSubscriptionKey()
+        public string GetSubscriptionKey()
             => SubscriptionKey;
 
-        public static void ResetSubscriptionKey()
+        public void SetDefaultRuleName()
+            => lastRuleName = "$Default";
+
+        public void ResetSubscriptionKey()
             => instanceSubscriptionKey = string.Empty;
 
-        public static async Task<string> SetFilter(ServiceBus configuration)
+        public async Task<string> SetFilter(ServiceBus configuration)
         {
             serviceBusConfiguration = configuration;
 
@@ -37,7 +40,7 @@ namespace DLQ.Message.Provider.Providers
             return filterRuleName;
         }
 
-        private static async Task<string> CreateInstanceSubscriptionKeyAsync()
+        private async Task<string> CreateInstanceSubscriptionKeyAsync()
         {
             ServiceBusAdministrationClient managementClient = new ServiceBusAdministrationClient(serviceBusConfiguration.ManagementConnectionString);
 
@@ -78,7 +81,7 @@ namespace DLQ.Message.Provider.Providers
             return instanceSubscriptionKey;
         }
 
-        private static async Task SetSubjectFilterAsync(string filterString)
+        private async Task SetSubjectFilterAsync(string filterString)
         {
             CorrelationRuleFilter correlationRuleFilter = new CorrelationRuleFilter()
             {
@@ -91,6 +94,9 @@ namespace DLQ.Message.Provider.Providers
             await CreateRuleAsync(serviceBusConfiguration.Topic, instanceSubscriptionKey, ruleOptions).ConfigureAwait(false);
             Debug.WriteLine($"ASB filter rule '{filterString}' created for SubscriptionKey: [{SubscriptionKey}]");
 
+            // If the Default rule is not deleted, filtering will not work properly.
+            // Messages from other servers will be queued up and end up in the Dead-Letter queue because they will
+            // remain unprocessed.
             if (!string.IsNullOrWhiteSpace(lastRuleName))
             {
                 await DeleteRuleAsync(serviceBusConfiguration.Topic, instanceSubscriptionKey, lastRuleName).ConfigureAwait(false);
@@ -99,7 +105,7 @@ namespace DLQ.Message.Provider.Providers
             lastRuleName = filterRuleName;
         }
 
-        private static async Task CreateRuleAsync(string configurationTopic, string instanceSubscriptionKey, CreateRuleOptions ruleOptions)
+        private async Task CreateRuleAsync(string configurationTopic, string instanceSubscriptionKey, CreateRuleOptions ruleOptions)
         {
             try
             {
@@ -116,7 +122,7 @@ namespace DLQ.Message.Provider.Providers
             }
         }
 
-        private static async Task DeleteRuleAsync(string configurationTopic, string instanceSubscriptionKey, string ruleName)
+        private async Task DeleteRuleAsync(string configurationTopic, string instanceSubscriptionKey, string ruleName)
         {
             try
             {

@@ -123,6 +123,7 @@ namespace DLQ.Message.Client
 
         private static async Task RunIterations()
         {
+            Random random = new Random();
             ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
             for (int index = 0; index < configuration.Application.TotalIterations; index++)
@@ -134,8 +135,21 @@ namespace DLQ.Message.Client
                 Console.WriteLine(string.Format("{0:D3} Iteration with ConnectionId '{{{1}}}'",
                     index + 1, configuration.Channels.Servers.First().ServiceBus.LastFilterNameUsed));
 
-                // FilterRule name
-                string filterRuleName = await clientProcessorLoader.DeadLetterQueueProcessorImpl.CreateFilterRule(serviceBus, true);
+                bool setDefaultRuleName = true;
+                bool resetSubscriptionKey = true;
+
+                if (configuration.Application.RandomizeFilterRule)
+                {
+                    setDefaultRuleName = Convert.ToBoolean(random.Next(2));
+                }
+
+                if (configuration.Application.RandomizeSubscriptionKey)
+                {
+                    resetSubscriptionKey = Convert.ToBoolean(random.Next(2));
+                }
+
+                string filterRuleName = await clientProcessorLoader.DeadLetterQueueProcessorImpl.CreateFilterRule(serviceBus, setDefaultRuleName, resetSubscriptionKey);
+                Console.WriteLine($"FilterRuleName: {filterRuleName}");
 
                 // Write messages to DLQ
                 await clientProcessorLoader.DeadLetterQueueProcessorImpl.WriteDLQMessages(serviceBus, configuration.Application.NumberofMessagestoSend).ConfigureAwait(false);

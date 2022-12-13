@@ -20,6 +20,9 @@ namespace DLQ.Message.Processor.Providers
 
         private List<SubscriptionDescription> subscriptionDescriptions = new List<SubscriptionDescription>();
         private List<SubscriptionDescription> subscriptionDescriptionsWorker = new List<SubscriptionDescription>();
+        private IList<ServiceBusReceivedMessage> serviceBusReceivedMessageList = new List<ServiceBusReceivedMessage>();
+
+        private SubscriptionFilter subscriptionFilter = new SubscriptionFilter(); 
 
         private BrokerMessage GetBrokerMessageFromBinaryData(BinaryData messageBinaryData)
             => (BrokerMessage)ArrayUtils.FromByteArray(messageBinaryData.ToArray());
@@ -27,14 +30,20 @@ namespace DLQ.Message.Processor.Providers
         public List<SubscriptionDescription> GetTopicSubscriptions()
             => subscriptionDescriptions;
 
-        public async Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool resetSubscriptionKey)
+        public async Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool setDefaultRuleName, bool resetSubscriptionKey)
         {
+            if (setDefaultRuleName)
+            {
+                subscriptionFilter.SetDefaultRuleName();
+            }
+
             if (resetSubscriptionKey)
             {
-                SubscriptionFilter.ResetSubscriptionKey();
+                subscriptionFilter.ResetSubscriptionKey();
             }
-            filterRuleName = await SubscriptionFilter.SetFilter(serviceBusConfiguration).ConfigureAwait(false);
-            subscriptionKey = SubscriptionFilter.GetSubscriptionKey();
+
+            filterRuleName = await subscriptionFilter.SetFilter(serviceBusConfiguration).ConfigureAwait(false);
+            subscriptionKey = subscriptionFilter.GetSubscriptionKey();
             return filterRuleName;
         }
 
@@ -115,6 +124,9 @@ namespace DLQ.Message.Processor.Providers
                                 // Remove message from DLQ to processing...
                                 await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
                             }
+
+                            // Add message to List
+                            serviceBusReceivedMessageList.Add(brokerDLQMessage);
                         }
                         else
                         {
@@ -212,7 +224,7 @@ namespace DLQ.Message.Processor.Providers
 
         public async Task<IList<ServiceBusReceivedMessage>> ReadDeadLetterQueue(string subscriptionId, int messageCount)
         {
-            return null;
+            return serviceBusReceivedMessageList;
         }
 
         public async Task ProcessMessagesInSubscription(ServiceBus serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess)
