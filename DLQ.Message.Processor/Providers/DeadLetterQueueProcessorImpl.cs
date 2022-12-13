@@ -145,6 +145,7 @@ namespace DLQ.Message.Processor.Providers
             catch (ServiceBusException e)
             {
                 Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
+                Logger.error("ServiceBusException in DLQ Provider - Message={0}", e.Message);
                 if (e.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
                 {
                     subscriptionDescriptionsWorker.Remove(subcriptionDescription);
@@ -208,6 +209,11 @@ namespace DLQ.Message.Processor.Providers
                         Console.WriteLine($"SENT {string.Format("{0:D3}", index)}: MessageId={serviceBusMessage.MessageId} - [{brokerMessage.StringData}]");
                         Logger.info("SENT {0}: MessageId={1} - [{2}]", string.Format("{0:D3}", index), serviceBusMessage.MessageId, brokerMessage.StringData);
                     }
+                }
+                catch (ServiceBusException e)
+                {
+                    Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
+                    Logger.error("ServiceBusException in DLQ Provider - Message={0}", e.Message);
                 }
                 catch (Exception ex)
                 {
@@ -289,6 +295,7 @@ namespace DLQ.Message.Processor.Providers
             catch (ServiceBusException e)
             {
                 Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
+                Logger.error("ServiceBusException in DLQ Provider - Message={0}", e.Message);
             }
             catch (Exception ex)
             {

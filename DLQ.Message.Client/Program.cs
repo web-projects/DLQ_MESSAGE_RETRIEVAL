@@ -148,6 +148,9 @@ namespace DLQ.Message.Client
                     resetSubscriptionKey = Convert.ToBoolean(random.Next(2));
                 }
 
+                // in this proof-of-concept, we allow the client to setup the filtering rule and send a batch of messages
+                // that the server will eventually process a randomly number (0 to NumberofMessagestoSend) so that the 
+                // unprocessed messages end up in the dead-letter queue.
                 string filterRuleName = await clientProcessorLoader.DeadLetterQueueProcessorImpl.CreateFilterRule(serviceBus, setDefaultRuleName, resetSubscriptionKey);
                 Console.WriteLine($"FilterRuleName: {filterRuleName}");
 
