@@ -90,7 +90,7 @@ namespace DLQ.MessageRetriever.Providers
                 if (await deadLetterQueueProcessorImpl.HasTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
                 {
                     // Read messages from DLQ
-                    if (await deadLetterQueueProcessorImpl.ReadDLQMessages(serviceBusConfig).ConfigureAwait(false))
+                    if (await deadLetterQueueProcessorImpl.RemoveDLQMessages(serviceBusConfig).ConfigureAwait(false))
                     {
                         Console.WriteLine("All messages processed successfully from Deadletter queue.");
                         Logger.info("All messages processed successfully from Deadletter queue.");

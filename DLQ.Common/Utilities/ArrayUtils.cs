@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 
@@ -8,21 +9,39 @@ namespace DLQ.Common.Utilities
     {
         public static byte[] ToByteArray(Object obj)
         {
-            BinaryFormatter bf = new BinaryFormatter();
-            using (var ms = new MemoryStream())
+            try
             {
-                bf.Serialize(ms, obj);
-                return ms.ToArray();
+                BinaryFormatter bf = new BinaryFormatter();
+                using (var ms = new MemoryStream())
+                {
+                    bf.Serialize(ms, obj);
+                    return ms.ToArray();
+                }
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Exception in ToByteArray - {ex}");
+            }
+
+            return null;
         }
 
         public static Object FromByteArray(byte[] data)
         {
-            BinaryFormatter bf = new BinaryFormatter();
-            using (var ms = new MemoryStream(data))
+            try
             {
-                return bf.Deserialize(ms);
+                BinaryFormatter bf = new BinaryFormatter();
+                using (var ms = new MemoryStream(data))
+                {
+                    return bf.Deserialize(ms);
+                }
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Exception in ToByteArray - {ex}");
+            }
+
+            return null;
         }
     }
 }
