@@ -11,7 +11,7 @@ namespace DLQ.Message.Provider.Providers
         private const int iterationCount = 2;
         private Guid filterName;
         private string filterRuleName;
-        private ServiceBus serviceBusConfiguration;
+        private ServiceBusConfiguration serviceBusConfiguration;
 
         // default rule for SQLFilter which allows broker to receive all broadcasted messages
         private string lastRuleName = "$Default";
@@ -28,7 +28,7 @@ namespace DLQ.Message.Provider.Providers
         public void ResetSubscriptionKey()
             => instanceSubscriptionKey = string.Empty;
 
-        public async Task<string> SetFilter(ServiceBus configuration)
+        public async Task<string> SetFilter(ServiceBusConfiguration configuration)
         {
             serviceBusConfiguration = configuration;
 

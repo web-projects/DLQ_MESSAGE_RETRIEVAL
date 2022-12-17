@@ -8,12 +8,13 @@ namespace DLQ.Message.Processor.Providers
 {
     public interface IDeadLetterQueueProcessor
     {
-        Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool setDefaultRuleName, bool resetSubscriptionKey);
-        Task<bool> HasTopicSubscriptions(ServiceBus serviceBusConfiguration);
-        List<SubscriptionDescription> GetTopicSubscriptions();
-        Task<bool> RemoveDLQMessages(ServiceBus serviceBusConfiguration);
-        Task WriteDLQMessages(ServiceBus serviceBusConfiguration, int NumberofMessagestoSend);
-        Task ProcessMessagesInSubscription(ServiceBus serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess);
-        Task<IList<ServiceBusReceivedMessage>> ReadDeadLetterQueue(string subscriptionId, int messageCount);
+        void SetServiceBusConfiguration(ServiceBusConfiguration serviceBusConfig);
+        Task<string> CreateFilterRule(ServiceBusConfiguration serviceBusConfiguration, bool setDefaultRuleName, bool resetSubscriptionKey);
+        Task<IList<SubscriptionDescription>> GetTopicSubscriptionList();
+        Task WriteDLQMessages(ServiceBusConfiguration serviceBusConfiguration, int NumberofMessagestoSend);
+        //Task ProcessMessagesInSubscription(ServiceBusConfiguration serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess);
+        Task<IList<ServiceBusReceivedMessage>> ProcessDeadLetterQueueMessages(string subscriptionId, bool removeMessage);
+        //Task<bool> RemoveDLQMessages(ServiceBus serviceBusConfiguration);
+        //Task<IList<ServiceBusReceivedMessage>> RemoveMessagesFromDeadLetterQueueAsync(IList<ServiceBusReceivedMessage> serviceBusMessageList, string subscriptionKey);
     }
 }

@@ -5,6 +5,6 @@ namespace DLQ.Common.Configuration.ChannelConfig
     [Serializable]
     public class Servers
     {
-        public ServiceBus ServiceBus { get; set; }
+        public ServiceBusConfiguration ServiceBus { get; set; }
     }
 }

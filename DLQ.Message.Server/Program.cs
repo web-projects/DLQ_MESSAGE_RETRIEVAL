@@ -123,7 +123,7 @@ namespace DLQ.Message.Server
 
         private static async Task RunIterations()
         {
-            ServiceBus serviceBusConfig = configuration.Channels.Servers.First().ServiceBus;
+            ServiceBusConfiguration serviceBusConfig = configuration.Channels.Servers.First().ServiceBus;
             Random random = new Random();
 
             // Get Current Subscription List

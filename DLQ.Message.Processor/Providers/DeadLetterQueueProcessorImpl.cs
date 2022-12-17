@@ -1,7 +1,6 @@
 ﻿using Azure.Messaging.ServiceBus;
 using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.LoggerManager;
-using DLQ.Common.Utilities;
 using DLQ.Message.Provider.Providers;
 using Google.Protobuf;
 using IPA5.XO.ProtoBuf;
@@ -19,16 +18,14 @@ namespace DLQ.Message.Processor.Providers
         private string filterRuleName;
         private string subscriptionKey;
 
-        private List<SubscriptionDescription> subscriptionDescriptions = new List<SubscriptionDescription>();
-        private List<SubscriptionDescription> subscriptionDescriptionsWorker = new List<SubscriptionDescription>();
-        private IList<ServiceBusReceivedMessage> serviceBusReceivedMessageList = new List<ServiceBusReceivedMessage>();
+        private SubscriptionFilter subscriptionFilter = new SubscriptionFilter();
 
-        private SubscriptionFilter subscriptionFilter = new SubscriptionFilter(); 
+        private ServiceBusConfiguration serviceBusConfiguration;
 
-        public List<SubscriptionDescription> GetTopicSubscriptions()
-            => subscriptionDescriptions;
+        public void SetServiceBusConfiguration(ServiceBusConfiguration serviceBusConfig)
+            => serviceBusConfiguration = serviceBusConfig;
 
-        public async Task<string> CreateFilterRule(ServiceBus serviceBusConfiguration, bool setDefaultRuleName, bool resetSubscriptionKey)
+        public async Task<string> CreateFilterRule(ServiceBusConfiguration serviceBusConfiguration, bool setDefaultRuleName, bool resetSubscriptionKey)
         {
             if (setDefaultRuleName)
             {
@@ -45,31 +42,28 @@ namespace DLQ.Message.Processor.Providers
             return filterRuleName;
         }
 
-        public async Task<bool> HasTopicSubscriptions(ServiceBus serviceBusConfiguration)
+        public async Task<IList<SubscriptionDescription>> GetTopicSubscriptionList()
         {
-            if (subscriptionDescriptionsWorker.Count() == 0)
+            List<SubscriptionDescription> subscriptionDescriptionList = new List<SubscriptionDescription>();
+            ManagementClient managementClient = new ManagementClient(serviceBusConfiguration.ManagementConnectionString);
+
+            for (int skip = 0; skip < 1000; skip += 100)
             {
-                ManagementClient managementClient = new ManagementClient(serviceBusConfiguration.ManagementConnectionString);
+                IList<SubscriptionDescription> subscriptions = await managementClient.GetSubscriptionsAsync(serviceBusConfiguration.Topic, 100, skip);
 
-                for (int skip = 0; skip < 1000; skip += 100)
+                if (!subscriptions.Any())
                 {
-                    IList<SubscriptionDescription> subscriptions = await managementClient.GetSubscriptionsAsync(serviceBusConfiguration.Topic, 100, skip);
-
-                    if (!subscriptions.Any())
-                    {
-                        break;
-                    }
-
-                    subscriptionDescriptions.AddRange(subscriptions);
+                    break;
                 }
 
-                subscriptionDescriptionsWorker = subscriptionDescriptions;
-
-                Console.WriteLine($"Topic [{serviceBusConfiguration.Topic}] has {subscriptionDescriptions.Count()} active subscriptions.\r\n");
-                Logger.info("Topic [{0}] has {1} active subscriptions.", serviceBusConfiguration.Topic, subscriptionDescriptions.Count());
+                subscriptionDescriptionList.AddRange(subscriptions);
             }
 
-            return subscriptionDescriptions.Count() > 0;
+
+            Console.WriteLine($"Topic [{serviceBusConfiguration.Topic}] has {subscriptionDescriptionList.Count()} active subscriptions.\r\n");
+            Logger.info("Topic [{0}] has {1} active subscriptions.", serviceBusConfiguration.Topic, subscriptionDescriptionList.Count());
+
+            return subscriptionDescriptionList;
         }
 
         /// <summary>
@@ -78,7 +72,7 @@ namespace DLQ.Message.Processor.Providers
         /// <param name="serviceBusConfiguration"></param>
         /// <param name="log"></param>
         /// <returns></returns>
-        public async Task WriteDLQMessages(ServiceBus serviceBusConfiguration, int NumberofMessagestoSend)
+        public async Task WriteDLQMessages(ServiceBusConfiguration serviceBusConfiguration, int NumberofMessagestoSend)
         {
             ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
 
@@ -144,167 +138,277 @@ namespace DLQ.Message.Processor.Providers
             await sbClient.DisposeAsync().ConfigureAwait(false);
         }
 
-        public async Task<IList<ServiceBusReceivedMessage>> ReadDeadLetterQueue(string subscriptionId, int messageCount)
+        public async Task<IList<ServiceBusReceivedMessage>> ProcessDeadLetterQueueMessages(string subscriptionId, bool removeMessage)
         {
-            await Task.Delay(1);
-            return serviceBusReceivedMessageList;
-        }
+            IList<ServiceBusReceivedMessage> serviceBusProcessedMessageList = new List<ServiceBusReceivedMessage>();
 
-        public async Task ProcessMessagesInSubscription(ServiceBus serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess)
-        {
-            int counter = 0;
-
-            try
+            if (!string.IsNullOrWhiteSpace(subscriptionId))
             {
-                if (!string.IsNullOrWhiteSpace(subscriptionName) && numberMessagesToProcess > 0)
-                {
-                    Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
-                    Debug.WriteLine($"DLQ subscription: {subscriptionName}");
+                string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
+                string subscriptionName = subscriptionId + deadletterQueuePath;
 
-                    // DLQ Subscription
-                    ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
-                    ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName,
-                        new ServiceBusReceiverOptions()
-                        {
-                            PrefetchCount = numberMessagesToProcess,
-                            ReceiveMode = ServiceBusReceiveMode.PeekLock
-                        });
+                Debug.Write($"Processing messages in Subscription {subscriptionId} ... ");
 
-                    Console.WriteLine($"Processing DLQ messages for Subscription: '{subscriptionName}' ...");
-                    Logger.info("Processing DLQ messages for Subscription: '{0}' ...", subscriptionName);
-
-                    while (true)
+                // DLQ Subscription
+                ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
+                ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName,
+                    new ServiceBusReceiverOptions()
                     {
-                        ServiceBusReceivedMessage brokerActiveMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                        PrefetchCount = serviceBusConfiguration.MaxDLQMessagesToProcessPerIteration,
+                        ReceiveMode = ServiceBusReceiveMode.PeekLock
+                    });
 
-                        if (brokerActiveMessage is { })
-                        {
-                            ChannelData channelData = ChannelData.Parser.ParseFrom(brokerActiveMessage.Body.ToArray());
+                int counter = 0;
 
-                            if (channelData?.BrokerMessage is { })
-                            {
-                                lock (Console.Out)
-                                {
-                                    Console.WriteLine($"{string.Format("{0:D3}", ++counter)} Message: MessageId={brokerActiveMessage.MessageId} - [{channelData.BrokerMessage.StringData}]");
-                                    Logger.info("{0} Message: MessageId={1} - [{2}]", string.Format("{0:D3}", counter), brokerActiveMessage.MessageId, channelData.BrokerMessage.StringData);
-                                }
+                IReadOnlyList<ServiceBusReceivedMessage> brokerDLQMessageList = await sbReceiver.ReceiveMessagesAsync(serviceBusConfiguration.MaxDLQMessagesToProcessPerIteration, TimeSpan.FromMilliseconds(1000)).ConfigureAwait(false);
 
-                                // Remove message from Active List
-                                await sbReceiver.CompleteMessageAsync(brokerActiveMessage).ConfigureAwait(false);
-                            }
-
-                            if (counter >= numberMessagesToProcess)
-                            {
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine($"No active message. Total messages processed = {counter}");
-                            Logger.info("No active message. Total messages processed = {0}", counter);
-                            break;
-                        }
-                    }
-
-                    // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
-                    await sbReceiver.DisposeAsync().ConfigureAwait(false);
-                    await sbClient.DisposeAsync().ConfigureAwait(false);
-                }
-            }
-            catch (ServiceBusException e)
-            {
-                Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
-                Logger.error("ServiceBusException in DLQ Provider - Message={0}", e.Message);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Exception in DLQ Provider - Message={ex.Message}");
-            }
-        }
-
-        public async Task<bool> RemoveDLQMessages(ServiceBus serviceBusConfiguration)
-        {
-            if (subscriptionDescriptionsWorker.Count() == 0)
-            {
-                return false;
-            }
-
-            int counter = 0;
-            SubscriptionDescription subcriptionDescription = subscriptionDescriptionsWorker.First();
-
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(subcriptionDescription.SubscriptionName))
+                foreach (ServiceBusReceivedMessage brokerDLQMessage in brokerDLQMessageList)
                 {
-                    string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
-                    string subscriptionName = subcriptionDescription.SubscriptionName + deadletterQueuePath;
-
-                    Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
-                    Debug.WriteLine($"DLQ subscription: {subscriptionName}");
-
-                    // DLQ Subscription
-                    ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
-                    ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName);
-
-                    Console.WriteLine($"Processing DLQ messages for Subscription: '{subcriptionDescription.SubscriptionName}' ...");
-
-                    while (true)
+                    if (brokerDLQMessage is { })
                     {
-                        ServiceBusReceivedMessage brokerDLQMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+                        ChannelData channelData = ChannelData.Parser.ParseFrom(brokerDLQMessage.Body.ToArray());
 
-                        if (brokerDLQMessage is { })
+                        if (channelData?.BrokerMessage is { })
                         {
-                            Console.WriteLine($"{string.Format("{0:D3}", counter++)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
-
-                            ChannelData channelData = ChannelData.Parser.ParseFrom(brokerDLQMessage.Body.ToArray());
-
-                            if (channelData?.BrokerMessage is { })
-                            {
-                                lock (Console.Out)
-                                {
-                                    Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{channelData.BrokerMessage.StringData}]");
-                                    Logger.info("DLQ: MessageId={0} - [{1}]", brokerDLQMessage.MessageId, channelData.BrokerMessage.StringData);
-                                }
-
-                                // Peform resources and task cleanup
-                                // ToDO: send dead-letter-queue messages to reprocessing?
-
-                                // Remove message from DLQ to processing...
-                                await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
-                            }
-
                             // Add message to List
-                            serviceBusReceivedMessageList.Add(brokerDLQMessage);
-                        }
-                        else
-                        {
-                            break;
+                            serviceBusProcessedMessageList.Add(brokerDLQMessage);
+
+                            if (removeMessage)
+                            {
+                                // Remove message from Active List
+                                await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
+
+                                if (++counter >= serviceBusConfiguration.MaxDLQMessagesToProcessPerIteration)
+                                {
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                // Make the message available again for immediate processing as the lock on the message
+                                // held by the receiver will be released.
+                                await sbReceiver.AbandonMessageAsync(brokerDLQMessage).ConfigureAwait(false);
+                            }
                         }
                     }
-
-                    // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
-                    await sbReceiver.DisposeAsync().ConfigureAwait(false);
-                    await sbClient.DisposeAsync().ConfigureAwait(false);
-
-                    // Delete last entry in the worker
-                    subscriptionDescriptionsWorker.Remove(subcriptionDescription);
                 }
-            }
-            catch (ServiceBusException e)
-            {
-                Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
-                Logger.error("ServiceBusException in DLQ Provider - Message={0}", e.Message);
-                if (e.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
-                {
-                    subscriptionDescriptionsWorker.Remove(subcriptionDescription);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Exception in DLQ Provider - Message={ex.Message}");
+
+                // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
+                await sbReceiver.DisposeAsync().ConfigureAwait(false);
+                await sbClient.DisposeAsync().ConfigureAwait(false);
             }
 
-            return counter > 0;
+            return serviceBusProcessedMessageList;
         }
+
+        //public async Task ProcessMessagesInSubscription(ServiceBusConfiguration serviceBusConfiguration, string subscriptionName, int numberMessagesToProcess)
+        //{
+        //    int counter = 0;
+
+        //    try
+        //    {
+        //        if (!string.IsNullOrWhiteSpace(subscriptionName) && numberMessagesToProcess > 0)
+        //        {
+        //            Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
+        //            Debug.WriteLine($"DLQ subscription: {subscriptionName}");
+
+        //            // DLQ Subscription
+        //            ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
+        //            ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName,
+        //                new ServiceBusReceiverOptions()
+        //                {
+        //                    PrefetchCount = numberMessagesToProcess,
+        //                    ReceiveMode = ServiceBusReceiveMode.PeekLock
+        //                });
+
+        //            Console.WriteLine($"Processing DLQ messages for Subscription: '{subscriptionName}' ...");
+        //            Logger.info("Processing DLQ messages for Subscription: '{0}' ...", subscriptionName);
+
+        //            while (true)
+        //            {
+        //                ServiceBusReceivedMessage brokerActiveMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+
+        //                if (brokerActiveMessage is { })
+        //                {
+        //                    ChannelData channelData = ChannelData.Parser.ParseFrom(brokerActiveMessage.Body.ToArray());
+
+        //                    if (channelData?.BrokerMessage is { })
+        //                    {
+        //                        lock (Console.Out)
+        //                        {
+        //                            Console.WriteLine($"{string.Format("{0:D3}", ++counter)} Message: MessageId={brokerActiveMessage.MessageId} - [{channelData.BrokerMessage.StringData}]");
+        //                            Logger.info("{0} Message: MessageId={1} - [{2}]", string.Format("{0:D3}", counter), brokerActiveMessage.MessageId, channelData.BrokerMessage.StringData);
+        //                        }
+
+        //                        // Remove message from Active List
+        //                        await sbReceiver.CompleteMessageAsync(brokerActiveMessage).ConfigureAwait(false);
+        //                    }
+
+        //                    if (counter >= numberMessagesToProcess)
+        //                    {
+        //                        break;
+        //                    }
+        //                }
+        //                else
+        //                {
+        //                    Console.WriteLine($"No active message. Total messages processed = {counter}");
+        //                    Logger.info("No active message. Total messages processed = {0}", counter);
+        //                    break;
+        //                }
+        //            }
+
+        //            // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
+        //            await sbReceiver.DisposeAsync().ConfigureAwait(false);
+        //            await sbClient.DisposeAsync().ConfigureAwait(false);
+        //        }
+        //    }
+        //    catch (ServiceBusException e)
+        //    {
+        //        Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
+        //        Logger.error("ServiceBusException in DLQ Provider - Message={0}", e.Message);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Debug.WriteLine($"Exception in DLQ Provider - Message={ex.Message}");
+        //    }
+        //}
+
+        //public async Task<bool> RemoveDLQMessages(ServiceBusConfiguration serviceBusConfiguration)
+        //{
+        //    int counter = 0;
+        //    SubscriptionDescription subcriptionDescription = subscriptionDescriptionList.First();
+
+        //    try
+        //    {
+        //        if (!string.IsNullOrWhiteSpace(subcriptionDescription.SubscriptionName))
+        //        {
+        //            string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
+        //            string subscriptionName = subcriptionDescription.SubscriptionName + deadletterQueuePath;
+
+        //            Debug.WriteLine($"DLQ topic name _: {serviceBusConfiguration.Topic}");
+        //            Debug.WriteLine($"DLQ subscription: {subscriptionName}");
+
+        //            // DLQ Subscription
+        //            ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
+        //            ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName);
+
+        //            Console.WriteLine($"Processing DLQ messages for Subscription: '{subcriptionDescription.SubscriptionName}' ...");
+
+        //            while (true)
+        //            {
+        //                ServiceBusReceivedMessage brokerDLQMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+
+        //                if (brokerDLQMessage is { })
+        //                {
+        //                    Console.WriteLine($"{string.Format("{0:D3}", counter++)} - [{brokerDLQMessage.DeadLetterErrorDescription}] - Reason: {brokerDLQMessage.DeadLetterReason}");
+
+        //                    ChannelData channelData = ChannelData.Parser.ParseFrom(brokerDLQMessage.Body.ToArray());
+
+        //                    if (channelData?.BrokerMessage is { })
+        //                    {
+        //                        lock (Console.Out)
+        //                        {
+        //                            Console.WriteLine($"DLQ: MessageId={brokerDLQMessage.MessageId} - [{channelData.BrokerMessage.StringData}]");
+        //                            Logger.info("DLQ: MessageId={0} - [{1}]", brokerDLQMessage.MessageId, channelData.BrokerMessage.StringData);
+        //                        }
+
+        //                        // Peform resources and task cleanup
+        //                        // ToDO: send dead-letter-queue messages to reprocessing?
+
+        //                        // Remove message from DLQ to processing...
+        //                        await sbReceiver.CompleteMessageAsync(brokerDLQMessage).ConfigureAwait(false);
+        //                    }
+
+        //                    // Add message to List
+        //                    serviceBusReceivedMessageList.Add(brokerDLQMessage);
+        //                }
+        //                else
+        //                {
+        //                    break;
+        //                }
+        //            }
+
+        //            // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
+        //            await sbReceiver.DisposeAsync().ConfigureAwait(false);
+        //            await sbClient.DisposeAsync().ConfigureAwait(false);
+        //        }
+        //    }
+        //    catch (ServiceBusException e)
+        //    {
+        //        Debug.WriteLine($"ServiceBusException in DLQ Provider - Message={e.Message}");
+        //        Logger.error("ServiceBusException in DLQ Provider - Message={0}", e.Message);
+        //        if (e.Reason == ServiceBusFailureReason.MessagingEntityNotFound)
+        //        {
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Debug.WriteLine($"Exception in DLQ Provider - Message={ex.Message}");
+        //    }
+
+        //    return counter > 0;
+        //}
+
+        //public async Task<IList<ServiceBusReceivedMessage>> RemoveMessagesFromDeadLetterQueueAsync(IList<ServiceBusReceivedMessage> serviceBusMessageList, string subscriptionKey)
+        //{
+        //    IList<ServiceBusReceivedMessage> serviceBusRemovedMessageList = new List<ServiceBusReceivedMessage>();
+
+        //    if (!string.IsNullOrWhiteSpace(subscriptionKey) && serviceBusConfiguration.MaxDLQMessagesToProcessPerIteration > 0)
+        //    {
+        //        try
+        //        {
+        //            // DLQ Subscription
+        //            string deadletterQueuePath = serviceBusConfiguration.DeadLetterQueuePath;
+        //            string subscriptionName = subscriptionKey + deadletterQueuePath;
+
+        //            ServiceBusClient sbClient = new ServiceBusClient(serviceBusConfiguration.ConnectionString);
+        //            //ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName);
+        //            ServiceBusReceiver sbReceiver = sbClient.CreateReceiver(serviceBusConfiguration.Topic, subscriptionName,
+        //                new ServiceBusReceiverOptions()
+        //                {
+        //                    PrefetchCount = serviceBusConfiguration.MaxDLQMessagesToProcessPerIteration,
+        //                    ReceiveMode = ServiceBusReceiveMode.PeekLock
+        //                });
+
+        //            int counter = 0;
+
+        //            while (true)
+        //            {
+        //                ServiceBusReceivedMessage brokerActiveMessage = await sbReceiver.ReceiveMessageAsync(TimeSpan.FromMilliseconds(500)).ConfigureAwait(false);
+        //                //ServiceBusReceivedMessage brokerActiveMessage = serviceBusMessageList.First();
+
+        //                if (brokerActiveMessage is { })
+        //                {
+        //                    // Remove message from Active List
+        //                    await sbReceiver.CompleteMessageAsync(brokerActiveMessage).ConfigureAwait(false);
+        //                    // Remove message from current list
+        //                    serviceBusMessageList.Remove(brokerActiveMessage);
+        //                    // Add message to Removed List
+        //                    serviceBusRemovedMessageList.Add(brokerActiveMessage);
+
+        //                    if (++counter >= serviceBusConfiguration.MaxDLQMessagesToProcessPerIteration)
+        //                    {
+        //                        break;
+        //                    }
+        //                }
+        //                else
+        //                {
+        //                    break;
+        //                }
+        //            }
+
+        //            // DisposeAsync and CloseAsync were documented to be the same, so using DisposeAsync
+        //            await sbReceiver.DisposeAsync().ConfigureAwait(false);
+        //            await sbClient.DisposeAsync().ConfigureAwait(false);
+        //        }
+        //        catch (ServiceBusException ex) when
+        //            (ex.Reason == ServiceBusFailureReason.MessageLockLost)
+        //        {
+
+        //        }
+        //    }
+
+        //    return serviceBusRemovedMessageList;
+        //}
     }
 }

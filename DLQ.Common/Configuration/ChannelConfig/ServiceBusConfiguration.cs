@@ -3,7 +3,7 @@
 namespace DLQ.Common.Configuration.ChannelConfig
 {
     [Serializable]
-    public class ServiceBus
+    public class ServiceBusConfiguration
     {
         public string ManagementConnectionString { get; set; }
         public string ConnectionString { get; set; }
@@ -16,6 +16,7 @@ namespace DLQ.Common.Configuration.ChannelConfig
         public bool DeadLetterOnMessageExpiration { get; set; } = false;
         public string DeadLetterQueuePath { get; set; }
         public string LastFilterNameUsed { get; set; }
-        public int DeadLetterQueueCheckSec { get; set; }
+        public int DeadLetterQueueTimerDelaySec { get; set; }
+        public int MaxDLQMessagesToProcessPerIteration { get; set; }
     }
 }

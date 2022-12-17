@@ -1,7 +1,11 @@
-﻿using DLQ.Common.Configuration.ChannelConfig;
+﻿using Azure.Messaging.ServiceBus;
+using DLQ.Common.Configuration.ChannelConfig;
 using DLQ.Common.LoggerManager;
 using DLQ.Message.Processor.Providers;
+using IPA5.XO.ProtoBuf;
+using Microsoft.Azure.ServiceBus.Management;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,7 +20,7 @@ namespace DLQ.MessageRetriever.Providers
 
         private Timer refreshTimer;
         private int timeoutDelayMs;
-        private ServiceBus serviceBusConfig;
+        private ServiceBusConfiguration serviceBusConfiguration;
 
         private string filterRuleName;
 
@@ -30,7 +34,7 @@ namespace DLQ.MessageRetriever.Providers
             StopBackgroundTask();
         }
 
-        public async Task<string> ConnectAsync(ServiceBus serviceBus, int timeoutDelaySec, string filter)
+        public async Task<string> ConnectAsync(ServiceBusConfiguration serviceBus, int timeoutDelaySec, string filter)
         {
             // set filtering rule
             if (!string.IsNullOrWhiteSpace(filter))
@@ -45,9 +49,10 @@ namespace DLQ.MessageRetriever.Providers
             return filterRuleName;
         }
 
-        private void StartBackgroundTask(ServiceBus serviceBus, int timeoutDelaySec)
+        private void StartBackgroundTask(ServiceBusConfiguration serviceBusConfig, int timeoutDelaySec)
         {
-            serviceBusConfig = serviceBus;
+            serviceBusConfiguration = serviceBusConfig;
+            deadLetterQueueProcessorImpl.SetServiceBusConfiguration(serviceBusConfig);
             timeoutDelayMs = timeoutDelaySec * 1000;
             RegisterBackgroundTask(timeoutDelayMs);
         }
@@ -87,24 +92,42 @@ namespace DLQ.MessageRetriever.Providers
             try
             {
                 // Get Current Subscription List
-                if (await deadLetterQueueProcessorImpl.HasTopicSubscriptions(serviceBusConfig).ConfigureAwait(false))
+                IList<SubscriptionDescription> subscriptionDescriptionList = await deadLetterQueueProcessorImpl.GetTopicSubscriptionList();
+
+                if (subscriptionDescriptionList is { })
                 {
-                    // Read messages from DLQ
-                    if (await deadLetterQueueProcessorImpl.RemoveDLQMessages(serviceBusConfig).ConfigureAwait(false))
+                    foreach (SubscriptionDescription subscriptionDescription in subscriptionDescriptionList)
                     {
-                        Console.WriteLine("All messages processed successfully from Deadletter queue.");
-                        Logger.info("All messages processed successfully from Deadletter queue.");
+                        // Read messages from dead letter queue
+                        IList<ServiceBusReceivedMessage> serviceBusReceivedMessageList = await deadLetterQueueProcessorImpl.ProcessDeadLetterQueueMessages(subscriptionDescription.SubscriptionName, false).ConfigureAwait(false);
+                        System.Diagnostics.Debug.WriteLine($"Subscription {subscriptionDescription.SubscriptionName} has {serviceBusReceivedMessageList.Count} messages in DLQ.");
+
+                        if (serviceBusReceivedMessageList.Count > 0)
+                        {
+                            // Remove messages from dead letter queue
+                            IList<ServiceBusReceivedMessage> serviceBusRemovedMessageList = await deadLetterQueueProcessorImpl.ProcessDeadLetterQueueMessages(subscriptionDescription.SubscriptionName, true).ConfigureAwait(false);
+      
+                            if (serviceBusRemovedMessageList.Count > 0)
+                            {
+                                foreach (ServiceBusReceivedMessage message in serviceBusRemovedMessageList)
+                                {
+                                    ChannelData channelData = ChannelData.Parser.ParseFrom(message.Body.ToArray());
+
+                                    if (channelData?.BrokerMessage is { } brokerMessage)
+                                    {
+                                        //_ = loggingServiceClient.LogInfoAsync($"Message {brokerMessage.StringData} successfully removed from Deadletter queue.");
+                                        System.Diagnostics.Debug.WriteLine($"Message {brokerMessage.StringData} successfully removed from Deadletter queue.");
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"No Messages removed from Deadletter queue.");
+                            }
+
+                            break;
+                        }
                     }
-                    else
-                    {
-                        Console.WriteLine("No messages to process in DLQ found.");
-                        Logger.info("No messages to process in DLQ found.");
-                    }
-                    Console.WriteLine();
-                }
-                else
-                {
-                    Console.WriteLine($"\r\nNo subscriptions found for Topic: {serviceBusConfig.Topic}");
                 }
             }
             catch (Exception ex)

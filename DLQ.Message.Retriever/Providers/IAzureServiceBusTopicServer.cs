@@ -5,6 +5,6 @@ namespace DLQ.MessageRetriever.Providers
 {
     public interface IAzureServiceBusTopicServer
     {
-        Task<string> ConnectAsync(ServiceBus serviceBus, int timeoutDelaySec, string filter);
+        Task<string> ConnectAsync(ServiceBusConfiguration serviceBus, int timeoutDelaySec, string filter);
     }
 }

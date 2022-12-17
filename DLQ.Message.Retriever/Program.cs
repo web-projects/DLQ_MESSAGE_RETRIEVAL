@@ -92,7 +92,7 @@ namespace DLQ.Message.Retriever
 
                 InitializeProviders();
 
-                ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
+                ServiceBusConfiguration serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
                 // Setup background
                 pseudoBrokerId = Guid.NewGuid().ToString();

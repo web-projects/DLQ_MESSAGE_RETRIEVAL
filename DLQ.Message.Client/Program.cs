@@ -124,7 +124,7 @@ namespace DLQ.Message.Client
         private static async Task RunIterations()
         {
             Random random = new Random();
-            ServiceBus serviceBus = configuration.Channels.Servers.First().ServiceBus;
+            ServiceBusConfiguration serviceBus = configuration.Channels.Servers.First().ServiceBus;
 
             for (int index = 0; index < configuration.Application.TotalIterations; index++)
             {
