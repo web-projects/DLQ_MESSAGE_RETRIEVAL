@@ -1,0 +1,35 @@
+{
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:58790/",
+      "sslPort": 44339
+    }
+  },
+  "profiles": {
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "licensekey": "swdasdfas234j-=21934=14oieuK#SDASER",
+        "AuthServiceUrl": "https://dev-auth.tcipa.net",
+        "DataServiceUrl": "https://dev-data.tcipa.net",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "LoggingServiceUrl": "https://dev-logging.tcipa.net"
+      }
+    },
+    "IPA5.Broker": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "licensekey": "swdasdfas234j-=21934=14oieuK#SDASER",
+        "AuthServiceUrl": "https://dev-auth.tcipa.net",
+        "DataServiceUrl": "https://dev-data.tcipa.net",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "LoggingServiceUrl": "https://dev-logging.tcipa.net"
+      },
+      "applicationUrl": "https://localhost:5001;http://localhost:5000"
+    }
+  }
+}
